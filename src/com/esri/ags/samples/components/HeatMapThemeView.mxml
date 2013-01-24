@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+///////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2008-2013 Esri. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+///////////////////////////////////////////////////////////////////////////-->
+<!---
+
+The default component used for changing the heatmap widget layer's theme or color.
+-->
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009"
+         xmlns:s="library://ns.adobe.com/flex/spark"
+         xmlns:mx="library://ns.adobe.com/flex/mx"
+         width="100%">
+    <fx:Metadata>
+        [Event(name="themeSelectionChanged", type="flash.events.Event")] 
+    </fx:Metadata>
+    <s:layout>
+        <s:HorizontalLayout gap="15"
+                            horizontalAlign="left"
+                            verticalAlign="middle"/>
+    </s:layout>
+    <fx:Script>
+        <![CDATA[
+            import com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict;
+
+            import spark.events.IndexChangeEvent;
+
+            private var selectedThemeValue:String = "";
+
+            /**
+            * The title or label for the theme button bar.
+            * @param value
+            */
+            public function set themeLabel(value:String):void
+            {
+                m_themeLabel.text = value;
+            }
+
+            /**
+            * @private
+            */
+            public function get selectedTheme():String
+            {
+                return selectedThemeValue;
+            }
+
+            /**
+            * Used to set the currently active theme on the button bar component.
+            * @param value The named constant representing the theme.
+            * @see com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict
+            */
+            public function set theme(value:String):void
+            {
+                var themeObject:Object;
+                for (var i:int = 0; i < themeButtonBar.dataProvider.length; i++)
+                {
+                    themeObject = themeButtonBar.dataProvider.getItemAt(i);
+                    if (themeObject.data == value)
+                    {
+                        themeButtonBar.selectedIndex = i;
+                        break;
+                        dispatchEvent(new Event("themeSelectionChanged"));
+                    }
+                }
+                selectedThemeValue = value;
+            }
+
+            /**
+            * @private
+            */
+            protected function themeButtonBar_changeHandler(event:IndexChangeEvent):void
+            {
+                var selectedItem:Object = ButtonBar(event.target).selectedItem;
+                if (selectedItem)
+                {
+                    selectedThemeValue = ButtonBar(event.target).selectedItem.data;
+                    dispatchEvent(new Event("themeSelectionChanged"));
+                }
+            }
+        ]]>
+    </fx:Script>
+    <fx:Declarations>
+        <!-- Place non-visual elements (e.g., services, value objects) here -->
+    </fx:Declarations>
+    <!--- @private -->
+    <s:Label id="m_themeLabel"/>
+    <!--- ButtonBar component used to create the user interface for changing the heat map theme color. -->
+    <s:ButtonBar id="themeButtonBar"
+                 change="themeButtonBar_changeHandler(event)"
+                 skinClass="com.esri.ags.samples.skins.HeatMapButtonBarImageSkin">
+        <s:dataProvider>
+            <s:ArrayList>
+                <fx:Object data="{HeatMapGradientDict.RAINBOW_TYPE}"
+                           icon="@Embed('../../../../../assets/images/i_rainbow.png')"
+                           label="Rainbow"/>
+                <fx:Object data="{HeatMapGradientDict.RED_WHITE_BLUE_TYPE}"
+                           icon="@Embed('../../../../../assets/images/i_redwhiteblue.png')"
+                           label="Red, White, Blue"/>
+                <fx:Object data="{HeatMapGradientDict.THERMAL_TYPE}"
+                           icon="@Embed('../../../../../assets/images/i_thermal.png')"
+                           label="Thermal"/>
+            </s:ArrayList>
+        </s:dataProvider>
+    </s:ButtonBar>
+</s:Group>

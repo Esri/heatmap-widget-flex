@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+///////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2008-2013 Esri. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+///////////////////////////////////////////////////////////////////////////
+ -->
+<project name="esri-github-flex-samples (heatmap library and widget)"
+         basedir="."
+         default="main">
+
+    <!-- Load the environment properties file, if present. -->
+    <property file="${basedir}/env.properties"/>
+    <property environment="env"/>
+    <!-- Load the local or user properties file, if present. -->
+    <property file="${basedir}/local.properties"/>
+    <!-- Load the project properties file. -->
+    <property file="${basedir}/build.properties"/>
+
+    <target name="main"
+            depends="pre-build,clean-build-library,release-library,release-widget"
+            description="Full build (library and widget)"/>
+
+    <target name="pre-build"
+            depends="check-java-home,check-ant-home,check-flex-home,check-ags-api-home,check-ags-viewer-home"
+            description="Check for the required environment variables for compilation."/>
+
+    <target name="clean-build-library"
+            depends="clean-library,create-library-directories"
+            description="Cleans up the project library directories before compiling the library and documentation."/>
+
+    <target name="release-library"
+            depends="build-library,build-library-documentation,post-process-library"
+            description="Creates binary library (swc) and documentation for the project."/>
+
+    <target name="clean-build-widget"
+            depends="clean-widget,create-widget-directories"
+            description="Cleans up the project widget directories before compiling the widget."/>
+
+    <target name="release-widget"
+            depends="build-widget,post-process-widget"
+            description="Creates binary widget and assembles the widget for Application Builder."/>
+
+    <target name="check-environment">
+        <echo>Checking for the required environment variables for compilation.</echo>
+        <echo>OS: ${os.name} / ${os.version} / ${os.arch}</echo>
+    </target>
+
+    <target name="check-java-home"
+            description="Check JAVA_HOME for a directory."
+            unless="JAVA_HOME.set">
+        <echo message="JAVA_HOME is ${java.home}"/>
+        <available file="${java.home}"
+                   property="JAVA_HOME.set"
+                   type="dir"/>
+        <echo message="VM: ${java.vm.name} / ${java.vm.version}"/>
+        <echo message="Java: ${java.version}"/>
+    </target>
+
+    <target name="check-ant-home"
+            description="Check ANT_HOME for a directory."
+            unless="ANT_HOME.set">
+        <echo message="ANT_HOME is ${ant.home}"/>
+        <available file="${env.ANT_HOME}"
+                   property="ANT_HOME.set"
+                   type="dir"/>
+        <echo message="Ant: ${ant.version} Ant Java Version: ${ant.java.version}"/>
+        <echo message="Ant Project: ${ant.project.name}"/>
+        <echo message="Ant Project Build file: ${ant.file}"/>
+    </target>
+
+    <target name="check-flex-home"
+            description="Check FLEX_HOME for a directory."
+            unless="FLEX_HOME.set">
+        <echo message="FLEX_HOME is ${env.FLEX_HOME}"/>
+        <available file="${env.FLEX_HOME}"
+                   property="FLEX_HOME.set"
+                   type="dir"/>
+        <fail message="The environment variable FLEX_HOME is not set to a directory." unless="FLEX_HOME.set"/>
+        <property name="project.flex.libs" value="${env.FLEX_HOME}/frameworks/libs"/>
+        <taskdef classpath="${env.FLEX_HOME}/ant/lib/flexTasks.jar" resource="flexTasks.tasks"/>
+    </target>
+
+    <target name="check-ags-api-home"
+            description="Check AGS_API_HOME for both a directory and a swc file."
+            unless="AGS_API_HOME.set">
+        <echo message="AGS_API_HOME is ${env.AGS_API_HOME}"/>
+        <available file="${env.AGS_API_HOME}"
+                   property="AGS_API_HOME.set"
+                   type="dir"/>
+        <fail message="The environment variable AGS_API_HOME is not set to a directory." unless="AGS_API_HOME.set"/>
+
+        <property name="ags.swc" value="${env.AGS_API_HOME}/${project.ags.swc}"/>
+        <available file="${ags.swc}"
+                   property="ags.swc.exists"
+                   type="file"/>
+        <fail message="The file ${ags.swc} does not exist." unless="ags.swc.exists"/>
+        <echo message="Using ArcGIS API for Flex (${project.ags.swc}) in"/>
+        <echo message="${env.AGS_API_HOME}"/>
+        <property name="project.ags.libs" value="${env.AGS_API_HOME}"/>
+    </target>
+
+    <target name="check-ags-viewer-home"
+            description="Check AGS_VIEWER_HOME for a directory."
+            unless="AGS_VIEWER_HOME.set">
+        <echo message="AGS_VIEWER_HOME is ${env.AGS_VIEWER_HOME}"/>
+        <available file="${env.AGS_VIEWER_HOME}"
+                   property="AGS_VIEWER_HOME.set"
+                   type="dir"/>
+        <fail message="The environment variable AGS_VIEWER_HOME is not set to a directory." unless="AGS_VIEWER_HOME.set"/>
+
+        <echo message="Using ArcGIS Viewer for Flex in"/>
+        <echo message="${env.AGS_VIEWER_HOME}"/>
+        <property name="project.viewer.directory" value="${env.AGS_VIEWER_HOME}"/>
+    </target>
+
+    <target name="set-project-properties"
+            description="Sets properties used in compiling and distributing the library and widget project."
+            unless="PROJECT_PROPERTIES.set">
+        <tstamp>
+            <format pattern="yyyy-MM-dd" property="todaysbuild"/>
+        </tstamp>
+        <property name="project.library.src" location="${basedir}/src"/>
+        <property name="project.library.output" location="${basedir}/${project.library.release}"/>
+        <property name="project.library.asdoc.output" location="${basedir}/${project.asdoc.release}"/>
+        <property name="project.library.bin.swc" value="agslib-${project.library.release.version}-${project.library.release.name}-${todaysbuild}.swc"/>
+
+        <property name="project.widget.output" location="${basedir}/${project.widget.release}"/>
+        <property name="project.widget.deps" location="${basedir}/build-widget-deps"/>
+        <property name="PROJECT_PROPERTIES.set" value="true"/>
+    </target>
+
+    <target name="clean-library"
+            depends="set-project-properties"
+            description="Deletes the contents of the binary and distribution project library directories.">
+        <delete dir="${project.library.output}"/>
+        <delete dir="${project.library.asdoc.output}"/>
+    </target>
+
+    <target name="create-library-directories"
+            depends="set-project-properties"
+            description="Creates the distribution and documentation output directories for the project.">
+        <mkdir dir="${project.library.output}"/>
+        <mkdir dir="${project.library.asdoc.output}"/>
+    </target>
+
+    <target name="build-library"
+            depends="clean-build-library,pre-build"
+            description="Compiles the project source code into a library file (swc).">
+        <echo message="Starting component compiler process..."/>
+        <echo message="Compiling ${project.library.src}"/>
+        <java failonerror="true"
+              fork="true"
+              jar="${env.FLEX_HOME}/lib/compc.jar"
+              maxmemory="384m">
+            <jvmarg value="-Dsun.io.useCanonCaches=false"/>
+            <arg line="+flexlib='${env.FLEX_HOME}/frameworks'"/>
+            <arg line="-headless-server"/>
+            <arg line="-external-library-path+='${project.flex.libs}'"/>
+            <arg line="-external-library-path+='${project.flex.libs}/mx'"/>
+            <arg line="-external-library-path+='${project.flex.libs}/air'"/>
+            <arg line="-external-library-path+='${project.ags.libs}'"/>
+            <arg line="-load-config+='${basedir}/build-deps/samples-namespace.xml'"/>
+            <arg line="-include-namespaces '${project.namespace}'"/>
+            <arg line="-include-sources '${basedir}/src'"/>
+            <arg line="-locale=en_US"/>
+            <arg line="-source-path '${basedir}/src' "/>
+            <arg line="-include-stylesheet defaults.css '${basedir}/src/defaults.css'"/>
+            <arg line="-include-file design.xml '${basedir}/src/design.xml'"/>
+            <arg line="-output '${project.library.output}/${project.library.bin.swc}'"/>
+        </java>
+        <echo message="Finishing component compiler process..."/>
+        <echo message="Finished compiling ${project.library.src}"/>
+        <echo message="Success! Created ${project.library.bin.swc}"/>
+    </target>
+
+    <target name="build-library-documentation"
+            depends="clean-build-library,pre-build"
+            description="Compiles the source code documentation (asdoc) into HTML documentation.">
+        <echo message="Generating documentation..."/>
+        <java classname="flex2.tools.ASDoc"
+              classpath="${env.FLEX_HOME}/lib/asdoc.jar"
+              failonerror="true"
+              fork="true"
+              maxmemory="1024m">
+            <jvmarg value="-Dsun.io.useCanonCaches=false"/>
+            <jvmarg value="-Xbootclasspath/p:'${env.FLEX_HOME}/lib/xalan.jar'"/>
+            <arg line="+flexlib='${env.FLEX_HOME}/frameworks'"/>
+            <arg line="-headless-server"/>
+            <arg line="-external-library-path+='${project.flex.libs}'"/>
+            <arg line="-external-library-path+='${project.flex.libs}/mx'"/>
+            <arg line="-external-library-path+='${project.flex.libs}/air'"/>
+            <arg line="-external-library-path+='${project.ags.libs}'"/>
+            <arg line="-load-config+='${basedir}/build-deps/samples-namespace.xml'"/>
+            <arg line="-load-config+='${basedir}/build-deps/doc/samples-asdoc-config.xml'"/>
+            <arg line="-package-description-file+='${basedir}/build-deps/doc/samples-package-descriptions.xml'"/>
+            <arg line="-doc-sources '${basedir}/src'"/>
+            <arg line="-source-path '${basedir}/src'"/>
+            <arg line="-output '${project.library.asdoc.output}'"/>
+            <arg line="-keep-xml=true"/>
+            <arg line="-main-title '${project.asdoc.main-title}'"/>
+            <arg line="-window-title '${project.asdoc.window-title}'"/>
+        </java>
+        <echo message="Success! Finished generating documentation..."/>
+    </target>
+
+    <target name="post-process-library"
+            depends="build-library,build-library-documentation"
+            description="Copies documentation into the library (swc) for IDE integration convenience.">
+        <echo message="Integrating documentation and project library swc"/>
+        <zip destfile="${project.library.output}/${project.library.bin.swc}" update="true">
+            <zipfileset dir="${project.library.asdoc.output}/tempdita" prefix="docs">
+                <include name="packages.dita"/>
+                <include name="com.*.xml"/>
+            </zipfileset>
+        </zip>
+        <delete dir="${project.library.asdoc.output}/tempdita"/>
+        <delete file="${project.library.asdoc.output}/index.tmp"/>
+        <delete file="${project.library.asdoc.output}/toplevel.xml"/>
+        <echo message="Success! Finished integrating documentation and project library swc."/>
+    </target>
+
+    <target name="clean-widget"
+            depends="set-project-properties"
+            description="Deletes the contents of the widget distribution directory and widget dependencies directory.">
+        <delete dir="${project.widget.output}"/>
+        <delete dir="${project.widget.deps}"/>
+    </target>
+
+    <target name="create-widget-directories"
+            depends="set-project-properties"
+            description="Creates the widget distribution directory and widget dependencies directory for the viewer and application builder distribution.">
+        <mkdir dir="${project.widget.output}"/>
+        <mkdir dir="${project.widget.deps}"/>
+    </target>
+
+    <target name="create-viewer-module-linker-report"
+            depends="build-library,create-widget-directories"
+            description="Generates the viewer module linker report to optimize the viewer widget for the ArcGIS Viewer for Flex.">
+        <echo message="Starting mxmlc command-line compiler process..."/>
+        <echo message="Creating linker report for '${project.viewer.directory}'"/>
+        <java failonerror="true"
+              fork="true"
+              jar="${env.FLEX_HOME}/lib/mxmlc.jar"
+              maxmemory="384m">
+            <jvmarg value="-Dsun.io.useCanonCaches=false"/>
+            <arg line="+flexlib='${env.FLEX_HOME}/frameworks'"/>
+            <arg line="-headless-server"/>
+            <arg line="-compiler.library-path+='${project.flex.libs}'"/>
+            <arg line="-compiler.library-path+='${project.flex.libs}/mx'"/>
+            <arg line="-compiler.library-path+='${project.flex.libs}/air'"/>
+            <arg line="-compiler.library-path+='${project.ags.libs}'"/>
+            <arg line="-compiler.library-path+='${project.library.output}'"/>
+            <arg line="-compiler.keep-all-type-selectors=true"/>
+            <arg line="-compiler.locale='${project.viewer.locale}'"/>
+            <arg line="-compiler.source-path+='${project.viewer.directory}/locale/${project.viewer.locale}'"/>
+            <arg line="-compiler.source-path+='${project.viewer.directory}/src'"/>
+            <arg line="-compiler.source-path+='${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src'"/>
+            <arg line="-compiler.optimize=true"/>
+            <arg line="-warnings=true"/>
+            <arg line="-compiler.debug=false"/>
+            <arg line="-compiler.incremental=false"/>
+            <arg line="-link-report='${project.widget.deps}/flexviewer-linkreport.xml' '${project.viewer.directory}/src/index.mxml'"/>
+            <arg line="-output='${project.widget.deps}/index.swf'"/>
+        </java>
+        <echo message="Finished! Creating linker report for '${project.viewer.directory}'"/>
+    </target>
+
+    <target name="build-widget"
+            depends="clean-build-widget,create-viewer-module-linker-report"
+            description="Compiles the project widget source code into a binary widget file (swf).">
+        <echo message="Starting mxmlc command-line compiler process..."/>
+        <echo message="Compiling ${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.mxml"/>
+        <echo message="for project ${project.viewer.directory}"/>
+        <java failonerror="true"
+              fork="true"
+              jar="${env.FLEX_HOME}/lib/mxmlc.jar"
+              maxmemory="384m">
+            <jvmarg value="-Dsun.io.useCanonCaches=false"/>
+            <arg line="+flexlib='${env.FLEX_HOME}/frameworks'"/>
+            <arg line="-headless-server"/>
+            <arg line="-compiler.library-path+='${project.flex.libs}'"/>
+            <arg line="-compiler.library-path+='${project.flex.libs}/mx'"/>
+            <arg line="-compiler.library-path+='${project.flex.libs}/air'"/>
+            <arg line="-compiler.library-path+='${project.ags.libs}'"/>
+            <arg line="-compiler.library-path+='${project.library.output}'"/>
+            <arg line="-compiler.locale='${project.viewer.locale}'"/>
+            <arg line="-compiler.source-path+='${project.viewer.directory}/locale/${project.viewer.locale}'"/>
+            <arg line="-compiler.source-path+='${project.viewer.directory}/src'"/>
+            <arg line="-compiler.source-path+='${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src'"/>
+            <arg line="-compiler.keep-all-type-selectors=true"/>
+            <arg line="-warnings=true"/>
+            <arg line="-compiler.optimize=true"/>
+            <arg line="-compiler.debug=false"/>
+            <arg line="-compiler.incremental=false"/>
+            <arg line="-load-externs='${project.widget.deps}/flexviewer-linkreport.xml' '${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.mxml'"/>
+            <arg line="-output='${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.swf'"/>
+        </java>
+        <echo message="Finishing mxmlc command-line compiler process..."/>
+        <echo message="Finished compiling '${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.mxml'"/>
+        <echo message="Success! Created '${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.swf'"/>
+    </target>
+
+    <target name="post-process-widget"
+            depends="build-widget"
+            description="Bundles the project widget for the ArcGIS Viewer for Flex Application Builder integration.">
+        <echo message="Assembling widget for Application Builder."/>
+        <!-- check and fail for compiled widget swf -->
+        <available file="${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.swf" property="WIDGET_SWF.exists"/>
+        <fail message="${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}Widget.swf does not exist!" unless="WIDGET_SWF.exists"/>
+
+        <!-- check and report for widget config -->
+        <available file="${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.xml" property="WIDGET_CONFIG.exists"/>
+        <condition else="false" property="WIDGET_CONFIG.set">
+            <isset property="WIDGET_CONFIG.exists"/>
+        </condition>
+        <echo message="Does the ${project.widget.moduleSubDirectory}Widget include a config file ? ${WIDGET_CONFIG.set} : ${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.xml"/>
+
+        <!-- check and report for assets -->
+        <available file="${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/assets"
+                   property="WIDGET_ASSETS.exists"
+                   type="dir"/>
+        <condition else="false" property="WIDGET_ASSETS.set">
+            <isset property="WIDGET_ASSETS.exists"/>
+        </condition>
+        <echo message="Does the ${project.widget.moduleSubDirectory}Widget include additional assets ? ${WIDGET_ASSETS.set} : ${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/assets"/>
+
+        <!-- check and report for meta config file -->
+        <available file="${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/meta.xml" property="WIDGET_META.exists"/>
+        <condition else="false" property="WIDGET_META.set">
+            <isset property="WIDGET_META.exists"/>
+        </condition>
+        <echo message="Does the ${project.widget.moduleSubDirectory}Widget include a meta config file ? ${WIDGET_META.set} : ${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/meta.xml"/>
+
+        <!-- Copy the widget config file -->
+        <echo message="Copying '${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.xml'"/>
+        <echo message="to '${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}'"/>
+        <copy includeemptydirs="true" todir="${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}">
+            <fileset file="${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/${project.widget.moduleSubDirectory}Widget.xml"/>
+        </copy>
+
+        <!-- Copy the widget assets -->
+        <echo message="Copying '${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/assets/*'"/>
+        <echo message="to '${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/assets'"/>
+        <mkdir dir="${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/assets"/>
+        <copy includeemptydirs="true" todir="${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/assets">
+            <fileset dir="${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/assets">
+                <include name="**/*"/>
+            </fileset>
+        </copy>
+
+        <!-- Copy the meta file -->
+        <echo message="Copying '${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/meta.xml'"/>
+        <echo message="to '${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/meta.xml'"/>
+        <copy file="${basedir}/viewer-${project.widget.moduleSubDirectory}Widget/src/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/meta.xml" tofile="${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}/meta.xml"/>
+
+        <!-- Package the resources for Application Builder -->
+        <zip destfile="${project.library.output}/AppBuilder-${project.appbuilder.release.version}_${project.appbuilder.widget.release.name}Widget-${project.appbuilder.widget.release.version}.zip">
+            <zipfileset dir="${project.widget.output}/${project.widget.moduleDirectory}/${project.widget.moduleSubDirectory}" includes="**/*"/>
+        </zip>
+        <echo message="Success! Assembled widget for Application Builder."/>
+        <antcall target="clean-widget"/>
+    </target>
+</project>

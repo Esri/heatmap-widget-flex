@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+///////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2008-2013 Esri. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+///////////////////////////////////////////////////////////////////////////
+-->
+<viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009"
+                   xmlns:s="library://ns.adobe.com/flex/spark"
+                   xmlns:esri="http://www.esri.com/2008/ags"
+                   xmlns:samples="library://ns.esri.com/github/2013/flex/samples"
+                   xmlns:viewer="com.esri.viewer.*"
+                   x="600" y="300"
+                   widgetConfigLoaded="init()">
+    <viewer:states>
+        <s:State name="mainState"/>
+        <s:State name="settingsState"/>
+    </viewer:states>
+
+    <viewer:transitions>
+        <s:Transition autoReverse="true" toState="*">
+            <s:Fade targets="{[settingsState,mainState]}"/>
+        </s:Transition>
+    </viewer:transitions>
+    <fx:Script>
+        <![CDATA[
+            import com.esri.ags.events.DetailsEvent;
+            import com.esri.ags.layers.supportClasses.TimeInfo;
+            import com.esri.ags.samples.events.HeatMapEvent;
+            import com.esri.ags.samples.layers.ArcGISHeatMapLayer;
+            import com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict;
+            import com.esri.ags.samples.utils.ColorMatrixUtil;
+            import com.esri.ags.samples.utils.UIComponentUtil;
+
+            import spark.events.IndexChangeEvent;
+
+            //--------------------------------------
+            // UI related variables 
+            //--------------------------------------
+            [Bindable]
+            private var isRefreshing:Boolean = false;
+            [Bindable]
+            private var refreshingLabel:String;
+            [Bindable]
+            private var featureCountLabel:String;
+            private var ICON_URL:String = "assets/images/";
+            [Bindable]
+            private var wWidth:Number = 400;
+            [Bindable]
+            private var wHeight:Number = 240;
+            [Bindable]
+            private var mainIcon:String;
+            [Bindable]
+            private var mainLabel:String;
+            [Bindable]
+            private var settingsIcon:String;
+            [Bindable]
+            private var settingsLabel:String;
+            [Bindable]
+            private var heatmapQueryCompLabel:String;
+            private var heatmapQuery_prompt:String;
+            private var heatmapTypes_label:String;
+            private var heatmapTypes_data:String;
+            [Bindable]
+            private var transpCompLabel:String;
+            [Bindable]
+            private var heatmapCompLabel:String;
+
+            //--------------------------------------
+            // HeatMap layer variables
+            //--------------------------------------
+            private var heatmap_QueryURL:String;
+            [Bindable]
+            private var heatmapAlpha:Number;
+            private var heatmapLayername:String;
+            private var heatmapDefaultQuery:String;
+            private var heatmapQueryTemplate:String;
+            private var useamf:Boolean;
+            private var useproxy:Boolean;
+            private var proxyurl:String;
+            [Bindable]
+            private var heatmapTheme:String;
+            private var outFields:String;
+            private var outFieldsArr:Array;
+            [Bindable]
+            private var m_heatMapLayer:ArcGISHeatMapLayer;
+            [Bindable]
+            private var timeInfo:TimeInfo;
+            [Bindable]
+            private var featureCount:int;
+            private var featureArr:Array;
+
+            //--------------------------------------
+            // TimeSlider variables
+            //--------------------------------------
+            [Bindable]
+            private var sliderLoop:Boolean = false;
+            [Bindable]
+            private var sliderThumbCount:int = 1;
+            [Bindable]
+            private var sliderThumbMovingRate:int = 1200;
+
+
+            private function init():void
+            {
+                if (configXML)
+                {
+                    var mWidth:String = configXML.ui.widget_dimensions.width || "300";
+                    var mHeight:String = configXML.ui.widget_dimensions.height || "300";
+                    wWidth = Number(mWidth);
+                    wHeight = Number(mHeight);
+                    wTemplate.width = wWidth;
+                    wTemplate.height = wHeight;
+                    ICON_URL = configXML.ui.icons.base_url || "widgets/HeatMap/assets/";
+                    mainIcon = configXML.ui.icons.main_icon || "i_heatmap.png";
+                    mainLabel = configXML.ui.icons.main_label || "HeatMap Panel";
+                    settingsIcon = configXML.ui.icons.settings_icon || "i_options.png";
+                    settingsLabel = configXML.ui.icons.settings_label || "Settings Panel";
+                    refreshingLabel = configXML.ui.refresh_label || "refreshing layer ....";
+                    featureCountLabel = configXML.ui.query.featurecount_label || " features contained";
+                    heatmapAlpha = Number(configXML.ui.transparency.defaulttransparency) || 1.0;
+                    heatmapQueryCompLabel = configXML.ui.query.comp_label;
+                    heatmapQuery_prompt = configXML.ui.query.heatmapquery_prompt;
+                    transpCompLabel = configXML.ui.transparency.comp_label;
+                    heatmapCompLabel = configXML.ui.symbol.comp_label;
+                    heatmapTheme = configXML.ui.symbol.defaulttheme || HeatMapGradientDict.RAINBOW_TYPE;
+
+
+                    heatmapLayername = configXML.layers.layer.name || "Heatmap Layer";
+                    heatmapTypes_label = configXML.layers.layer.type_descs;
+                    heatmapTypes_data = configXML.layers.layer.types;
+                    cboLayerType.dataProvider = UIComponentUtil.getComboBoxDataProvider(heatmapTypes_label, heatmapTypes_data, heatmapQuery_prompt);
+                    heatmapDefaultQuery = configXML.layers.layer.defaultquery || "1=1";
+                    heatmapQueryTemplate = configXML.layers.layer.querytemplate || "TYPE = 'REPLACE_STR'";
+                    useamf = configXML.layers.layer.useamf == "true";
+                    useproxy = configXML.layers.layer.useproxy == "true";
+                    if (useproxy)
+                    {
+                        proxyurl = configData.proxyUrl;
+                    }
+                    heatmap_QueryURL = configXML.layers.layer.url;
+                    outFields = configXML.layers.layer.outFields || "*";
+                    outFieldsArr = outFields.split(",");
+
+                    var dateFormat:String = configXML.ui.timeslider.dateformat;
+                    if (dateFormat)
+                    {
+                        dateTimeFormatter.dateTimePattern = dateFormat;
+                    }
+                    sliderLoop = configXML.ui.timeslider.loop == "true";
+                    if (!isNaN(parseInt(configXML.ui.timeslider.thumbcount)))
+                    {
+                        sliderThumbCount = parseInt(configXML.ui.timeslider.thumbcount);
+                    }
+                    if (!isNaN(parseInt(configXML.ui.timeslider.thumbmovingrate)))
+                    {
+                        sliderThumbMovingRate = parseInt(configXML.ui.timeslider.thumbmovingrate);
+                    }
+                }
+
+                m_heatMapLayer = new ArcGISHeatMapLayer();
+                m_heatMapLayer.addEventListener(DetailsEvent.GET_DETAILS_COMPLETE, getDetailsCompleteHandler, false, 0, true);
+                m_heatMapLayer.addEventListener(HeatMapEvent.REFRESH_START, refreshStartHandler, false, 0, true);
+                m_heatMapLayer.addEventListener(HeatMapEvent.REFRESH_END, refreshEndHandler, false, 0, true);
+                m_heatMapLayer.url = heatmap_QueryURL;
+                m_heatMapLayer.name = heatmapLayername;
+                m_heatMapLayer.alpha = heatmapAlpha
+                m_heatMapLayer.where = heatmapDefaultQuery;
+                m_heatMapLayer.useAMF = useamf;
+                if (proxyurl != null)
+                {
+                    m_heatMapLayer.proxyURL = proxyurl;
+                }
+                else
+                {
+                    m_heatMapLayer.proxyURL = null;
+                }
+                m_heatMapLayer.outFields = outFieldsArr;
+                map.addLayer(m_heatMapLayer);
+                showStateMainUI();
+                wTemplate.addTitlebarButton(ICON_URL + mainIcon, mainLabel, showStateMainUI);
+                wTemplate.addTitlebarButton(ICON_URL + settingsIcon, settingsLabel, showStateOptionsUI);
+            }
+
+            //--------------------------------------
+            //  Core widget functions
+            //--------------------------------------
+            private function showStateMainUI():void
+            {
+                this.currentState = "mainState";
+            }
+
+            private function showStateOptionsUI():void
+            {
+                this.currentState = "settingsState";
+            }
+
+            private function widgetClosedHandler(event:Event):void
+            {
+                m_heatMapLayer.visible = false;
+                setMapNavigation(null, null);
+            }
+
+            private function widgetOpenedHandler(event:Event):void
+            {
+                if (m_heatMapLayer)
+                {
+                    m_heatMapLayer.visible = true;
+                }
+            }
+
+            //--------------------------------------
+            //  HeatMap layer event listener functions
+            //--------------------------------------
+            protected function refreshStartHandler(event:HeatMapEvent):void
+            {
+                if (m_heatMapLayer.visible)
+                {
+                    isRefreshing = true;
+                    loadingMessage.showMessage(refreshingLabel, true);
+                    m_heatMapLayer.filters = [ ColorMatrixUtil.blackAndWhiteFilter ];
+                    fadeEffectOut.play();
+                }
+            }
+
+            protected function refreshEndHandler(event:HeatMapEvent):void
+            {
+                if (m_heatMapLayer.visible)
+                {
+                    isRefreshing = false;
+                    loadingMessage.showMessage("", false);
+                    fadeEffectIn.play();
+                    m_heatMapLayer.filters = [];
+                    featureCount = event.count;
+
+                    if (sliderThumbCount == 2 && timeToggleButton.selected)
+                    {
+                        var startDateTime:Date = timeSlider.timeExtent.startTime;
+                        var endDateTime:Date = timeSlider.timeExtent.endTime;
+                        timeSliderLabel.text = dateTimeFormatter.format(startDateTime) + " - " + dateTimeFormatter.format(endDateTime);
+                    }
+                    else if (sliderThumbCount == 1 && timeToggleButton.selected)
+                    {
+                        timeSliderLabel.text = dateTimeFormatter.format(timeSlider.timeExtent.endTime);
+                    }
+                }
+            }
+
+            protected function getDetailsCompleteHandler(event:DetailsEvent):void
+            {
+                timeInfo = event.layerDetails.timeInfo;
+            }
+
+            //--------------------------------------
+            //  Widget UI related functions
+            //--------------------------------------
+            protected function cboLayerType_changeHandler(event:IndexChangeEvent):void
+            {
+                var selectedText:String = DropDownList(event.currentTarget).selectedItem.data;
+                if (selectedText != "-1")
+                {
+                    var newQuery:String = heatmapQueryTemplate.replace("REPLACE_STR", selectedText);
+                    m_heatMapLayer.where = newQuery;
+                }
+                else
+                {
+                    m_heatMapLayer.where = heatmapDefaultQuery;
+                }
+            }
+
+            protected function transparencyChangeHandler(event:Event):void
+            {
+                heatmapAlpha = sliderTransparency.value;
+                m_heatMapLayer.alpha = heatmapAlpha;
+            }
+
+            protected function widgetMinimizedHandler(event:Event):void
+            {
+                m_heatMapLayer.visible = false;
+            }
+
+            protected function timeToggleButtonChangeHandler(event:Event):void
+            {
+                if (timeInfo && m_heatMapLayer.loaded)
+                {
+                    if (timeToggleButton.selected)
+                    {
+                        timeSlider.createTimeStopsByTimeInterval(timeInfo.timeExtent, timeInfo.timeInterval, timeInfo.timeIntervalUnits);
+                        map.timeSlider = timeSlider;
+                    }
+                    else
+                    {
+                        timeSlider.pause();
+                        map.timeExtent = null;
+                        map.timeSlider = null;
+                        m_heatMapLayer.timeExtent = timeInfo.timeExtent;
+                    }
+                }
+            }
+
+            protected function themeSelectionChangedHandler(event:Event):void
+            {
+                m_heatMapLayer.theme = heatMapThemeView.selectedTheme;
+            }
+        ]]>
+    </fx:Script>
+    <fx:Declarations>
+        <!-- Place non-visual elements (e.g., services, value objects) here -->
+        <s:Fade id="fadeEffectOut"
+                alphaFrom="{heatmapAlpha}"
+                alphaTo="0.5"
+                repeatCount="1"
+                targets="{[m_heatMapLayer]}"/>
+        <s:Fade id="fadeEffectIn"
+                alphaFrom="0.5"
+                alphaTo="{heatmapAlpha}"
+                repeatCount="1"
+                targets="{[m_heatMapLayer]}"/>
+        <s:DateTimeFormatter id="dateTimeFormatter" dateTimePattern="MMMM yyyy"/>
+    </fx:Declarations>
+
+    <viewer:WidgetTemplate id="wTemplate"
+                           closed="widgetClosedHandler(event)"
+                           minimized="widgetMinimizedHandler(event)"
+                           open="widgetOpenedHandler(event)"
+                           widgetHeight="{wHeight}"
+                           widgetWidth="{wWidth}">
+        <s:Group id="mainState"
+                 width="100%" height="100%"
+                 visible="false"
+                 visible.mainState="true">
+            <s:layout>
+                <s:VerticalLayout gap="6"
+                                  horizontalAlign="center"
+                                  paddingLeft="15"/>
+            </s:layout>
+            <s:HGroup id="boxGraphical"
+                      width="100%"
+                      gap="5"
+                      horizontalAlign="left"
+                      verticalAlign="middle">
+                <s:Label id="lblLayerType" text="{heatmapQueryCompLabel}"/>
+                <s:DropDownList id="cboLayerType"
+                                change="cboLayerType_changeHandler(event)"
+                                minWidth="150"
+                                requireSelection="true"/>
+            </s:HGroup>
+            <s:VGroup width="100%"
+                      left="20" top="300"
+                      horizontalAlign="left"
+                      includeInLayout="{timeToggleButton.selected}"
+                      verticalAlign="middle"
+                      visible="{timeToggleButton.selected}">
+                <esri:TimeSlider id="timeSlider"
+                                 enabled="{m_heatMapLayer.loaded}"
+                                 loop="{sliderLoop}"
+                                 thumbCount="{sliderThumbCount}"
+                                 thumbMovingRate="{sliderThumbMovingRate}"/>
+                <s:Label id="timeSliderLabel"
+                         fontSize="14"
+                         fontWeight="bold"
+                         text="{dateTimeFormatter.format(timeSlider.timeExtent.endTime)}"/>
+            </s:VGroup>
+            <s:HGroup id="boxCount"
+                      width="100%"
+                      gap="15"
+                      horizontalAlign="left"
+                      verticalAlign="middle">
+                <s:Label id="lblLayerCount" text="{featureCount} {featureCountLabel}"/>
+            </s:HGroup>
+            <samples:ProgressMessage id="loadingMessage" includeInLayout="{isRefreshing}"/>
+        </s:Group>
+        <s:Group id="settingsState"
+                 width="100%" height="100%"
+                 visible="false"
+                 visible.settingsState="true">
+            <s:layout>
+                <s:VerticalLayout gap="6"
+                                  horizontalAlign="center"
+                                  paddingLeft="15"/>
+            </s:layout>
+            <s:HGroup id="boxTransp"
+                      width="100%"
+                      gap="15"
+                      horizontalAlign="left">
+                <s:Label id="lblLayerTransp" text="{transpCompLabel}"/>
+                <s:HSlider id="sliderTransparency"
+                           change="transparencyChangeHandler(event)"
+                           liveDragging="true"
+                           maximum="1"
+                           minimum="0"
+                           showDataTip="true"
+                           stepSize="0.1"
+                           value="{heatmapAlpha}"/>
+            </s:HGroup>
+            <samples:HeatMapThemeView id="heatMapThemeView"
+                                      theme="{heatmapTheme}"
+                                      themeLabel="{heatmapCompLabel}"
+                                      themeSelectionChanged="themeSelectionChangedHandler(event)"/>
+            <s:HGroup id="boxTime"
+                      width="100%"
+                      gap="15"
+                      horizontalAlign="left"
+                      includeInLayout="{timeInfo != null}"
+                      verticalAlign="middle"
+                      visible="{timeInfo != null}">
+                <s:Label id="lblEnableTime" text="Time enabled:"/>
+                <s:ToggleButton id="timeToggleButton"
+                                change="timeToggleButtonChangeHandler(event)"
+                                fontWeight="bold"
+                                label="{timeToggleButton.selected ? 'On' : 'Off'}"
+                                selected="false"/>
+            </s:HGroup>
+        </s:Group>
+    </viewer:WidgetTemplate>
+</viewer:BaseWidget>

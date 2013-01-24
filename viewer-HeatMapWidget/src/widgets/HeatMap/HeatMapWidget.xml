@@ -1,0 +1,69 @@
+<?xml version="1.0"?>
+<!--
+///////////////////////////////////////////////////////////////////////////
+// Copyright (c) 2008-2013 Esri. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+///////////////////////////////////////////////////////////////////////////
+ -->
+<configuration>
+    <layers>
+        <layer>
+            <name>Earthquakes HeatMap</name>
+            <url>http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Earthquakes/Since_1970/MapServer/0</url>
+            <outFields>YYYYMMDD,Magnitude,Num_Injured,Num_Deaths,Name</outFields>
+            <useproxy>false</useproxy>
+            <useamf>true</useamf>
+            <defaultquery>1=1</defaultquery>
+            <querytemplate>Magnitude &gt; REPLACE_STR</querytemplate>
+            <types>2,4,6,8</types>
+            <type_descs>Mag &gt; 2,Mag &gt; 4,Mag &gt; 6,Mag &gt; 8</type_descs>
+        </layer>
+    </layers>
+    <ui>
+        <widget_dimensions>
+            <width>378</width>
+            <height>206</height>
+        </widget_dimensions>
+        <icons>
+            <base_url>widgets/HeatMap/assets/images/</base_url>
+            <main_icon>i_rainbow.png</main_icon>
+            <!-- Icon must exist under assets/images in viewer -->
+            <main_label>Main Panel</main_label>
+            <!-- Title/label for icon across the top widget panel -->
+            <settings_icon>i_options.png</settings_icon>
+            <settings_label>Settings Panel</settings_label>
+        </icons>
+        <refresh_label>refreshing layer...</refresh_label>
+        <query>
+            <comp_label>Earthquake Magnitude:</comp_label>
+            <heatmapquery_prompt>default selection</heatmapquery_prompt>
+            <featurecount_label> features contained</featurecount_label>
+        </query>
+        <timeslider>
+            <loop>true</loop>
+            <thumbcount>2</thumbcount>
+            <thumbmovingrate>1200</thumbmovingrate>
+            <dateformat>MMM, yyyy</dateformat>
+        </timeslider>
+        <transparency>
+            <comp_label>Transparency:</comp_label>
+            <defaulttransparency>0.7</defaulttransparency>
+        </transparency>
+        <symbol>
+            <comp_label>Theme:</comp_label>
+            <defaulttheme>RAINBOW</defaulttheme>
+            <!-- Must be one of RED_WHITE_BLUE, RAINBOW, or THERMAL -->
+        </symbol>
+    </ui>
+</configuration>

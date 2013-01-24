@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<design version="2">
+    <namespaces>
+        <namespace prefix="samples" uri="library://ns.esri.com/github/2013/flex/samples"/>
+    </namespaces>
+</design>
