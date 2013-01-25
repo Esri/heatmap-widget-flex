@@ -32,13 +32,14 @@
     </layers>
     <ui>
         <widget_dimensions>
-            <width>378</width>
+            <width>410</width>
             <height>206</height>
         </widget_dimensions>
         <icons>
             <base_url>widgets/HeatMap/assets/images/</base_url>
             <main_icon>i_rainbow.png</main_icon>
-            <!-- Icon must exist under assets/images in viewer -->
+            <!-- Icon must exist under widgets/HeatMap/assets/images in
+            viewer-HeatMapWidget/src -->
             <main_label>Main Panel</main_label>
             <!-- Title/label for icon across the top widget panel -->
             <settings_icon>i_options.png</settings_icon>
@@ -58,12 +59,27 @@
         </timeslider>
         <transparency>
             <comp_label>Transparency:</comp_label>
-            <defaulttransparency>0.7</defaulttransparency>
+            <defaulttransparency>0.8</defaulttransparency>
         </transparency>
+        <density>
+            <comp_label>Heat radius:</comp_label>
+            <defaultdensity>15</defaultdensity>
+        </density>
         <symbol>
-            <comp_label>Theme:</comp_label>
-            <defaulttheme>RAINBOW</defaulttheme>
-            <!-- Must be one of RED_WHITE_BLUE, RAINBOW, or THERMAL -->
+            <comp_label>Colors:</comp_label>
+            <!-- The value for defaulttheme must be one of the
+                following values: RED_WHITE_BLUE, RAINBOW, THERMAL, or CUSTOM.
+                If you choose CUSTOM, make sure to update customtheme to match
+                your preference.
+                -->
+            <defaulttheme>CUSTOM</defaulttheme>
+            <!--
+                The array of colors are arranged from cooler colors to warmer colors (left to right).
+                Try one of the following below or make your own.
+                Ring of Fire: 0xEBED95,0xEDB019,0xD24F0B,0xD21813,0xBA5B6D
+                Weather radar: 0x5DD869,0x39623C,0xC9CA61,0xE49B50,0x951815
+            -->
+            <customtheme>0xEBED95,0xEDB019,0xD24F0B,0xD21813,0xBA5B6D</customtheme>
         </symbol>
     </ui>
 </configuration>
