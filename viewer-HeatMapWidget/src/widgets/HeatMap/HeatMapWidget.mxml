@@ -19,7 +19,7 @@
 <viewer:BaseWidget xmlns:fx="http://ns.adobe.com/mxml/2009"
                    xmlns:s="library://ns.adobe.com/flex/spark"
                    xmlns:esri="http://www.esri.com/2008/ags"
-                   xmlns:samples="library://ns.esri.com/github/2013/flex/samples"
+                   xmlns:samples="com.esri.ags.samples.components.*"
                    xmlns:viewer="com.esri.viewer.*"
                    x="600" y="300"
                    widgetConfigLoaded="init()">
@@ -75,6 +75,8 @@
             [Bindable]
             private var transpCompLabel:String;
             [Bindable]
+            private var densityCompLabel:String;
+            [Bindable]
             private var heatmapCompLabel:String;
 
             //--------------------------------------
@@ -83,6 +85,8 @@
             private var heatmap_QueryURL:String;
             [Bindable]
             private var heatmapAlpha:Number;
+            [Bindable]
+            private var heatmapDensity:Number;
             private var heatmapLayername:String;
             private var heatmapDefaultQuery:String;
             private var heatmapQueryTemplate:String;
@@ -111,7 +115,6 @@
             [Bindable]
             private var sliderThumbMovingRate:int = 1200;
 
-
             private function init():void
             {
                 if (configXML)
@@ -130,12 +133,24 @@
                     refreshingLabel = configXML.ui.refresh_label || "refreshing layer ....";
                     featureCountLabel = configXML.ui.query.featurecount_label || " features contained";
                     heatmapAlpha = Number(configXML.ui.transparency.defaulttransparency) || 1.0;
-                    heatmapQueryCompLabel = configXML.ui.query.comp_label;
-                    heatmapQuery_prompt = configXML.ui.query.heatmapquery_prompt;
-                    transpCompLabel = configXML.ui.transparency.comp_label;
-                    heatmapCompLabel = configXML.ui.symbol.comp_label;
+                    heatmapDensity = Number(configXML.ui.density.defaultdensity) || 25;
+                    heatmapQueryCompLabel = configXML.ui.query.comp_label || "Heatmap query:";
+                    heatmapQuery_prompt = configXML.ui.query.heatmapquery_prompt || "default selection";
+                    transpCompLabel = configXML.ui.transparency.comp_label || "Transparency:";
+                    densityCompLabel = configXML.ui.density.comp_label || "Density radius";
+                    heatmapCompLabel = configXML.ui.symbol.comp_label || "Theme:";
                     heatmapTheme = configXML.ui.symbol.defaulttheme || HeatMapGradientDict.RAINBOW_TYPE;
 
+                    if (heatmapTheme == HeatMapGradientDict.CUSTOM_TYPE)
+                    {
+                        var customColors:Array = [ 0xEBED95, 0xEDB019, 0xD24F0B, 0xD21813, 0xBA5B6D ];
+                        var customColorsString:String = configXML.ui.symbol.customtheme;
+                        if (customColorsString && customColorsString.length > 3)
+                        {
+                            customColors = customColorsString.split(",");
+                        }
+                        HeatMapGradientDict.fillCustomPaletteMap(customColors);
+                    }
 
                     heatmapLayername = configXML.layers.layer.name || "Heatmap Layer";
                     heatmapTypes_label = configXML.layers.layer.type_descs;
@@ -177,7 +192,9 @@
                 m_heatMapLayer.name = heatmapLayername;
                 m_heatMapLayer.alpha = heatmapAlpha
                 m_heatMapLayer.where = heatmapDefaultQuery;
+                m_heatMapLayer.theme = heatmapTheme;
                 m_heatMapLayer.useAMF = useamf;
+                m_heatMapLayer.densityRadius = heatmapDensity;
                 if (proxyurl != null)
                 {
                     m_heatMapLayer.proxyURL = proxyurl;
@@ -229,7 +246,7 @@
                 {
                     isRefreshing = true;
                     loadingMessage.showMessage(refreshingLabel, true);
-                    m_heatMapLayer.filters = [ ColorMatrixUtil.blackAndWhiteFilter ];
+                    m_heatMapLayer.filters = [ ColorMatrixUtil.blackAndWhite ];
                     fadeEffectOut.play();
                 }
             }
@@ -283,6 +300,12 @@
             {
                 heatmapAlpha = sliderTransparency.value;
                 m_heatMapLayer.alpha = heatmapAlpha;
+            }
+
+            protected function densityChangeHandler(event:Event):void
+            {
+                heatmapDensity = sliderDensityRadius.value;
+                m_heatMapLayer.densityRadius = heatmapDensity;
             }
 
             protected function widgetMinimizedHandler(event:Event):void
@@ -394,7 +417,9 @@
                       width="100%"
                       gap="15"
                       horizontalAlign="left">
-                <s:Label id="lblLayerTransp" text="{transpCompLabel}"/>
+                <s:Label id="lblLayerTransp"
+                         width="100"
+                         text="{transpCompLabel}"/>
                 <s:HSlider id="sliderTransparency"
                            change="transparencyChangeHandler(event)"
                            liveDragging="true"
@@ -403,6 +428,19 @@
                            showDataTip="true"
                            stepSize="0.1"
                            value="{heatmapAlpha}"/>
+            </s:HGroup>
+            <s:HGroup id="boxDensity"
+                      width="100%"
+                      gap="15">
+                <s:Label id="lblLayerDensity"
+                         width="100"
+                         text="{densityCompLabel}"/>
+                <s:HSlider id="sliderDensityRadius"
+                           change="densityChangeHandler(event)"
+                           liveDragging="true"
+                           maximum="50"
+                           minimum="10"
+                           value="{heatmapDensity}"/>
             </s:HGroup>
             <samples:HeatMapThemeView id="heatMapThemeView"
                                       theme="{heatmapTheme}"
