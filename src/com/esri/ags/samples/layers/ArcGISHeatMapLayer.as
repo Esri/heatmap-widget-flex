@@ -16,17 +16,19 @@
 package com.esri.ags.samples.layers
 {
 
+import com.esri.ags.Graphic;
 import com.esri.ags.TimeExtent;
+import com.esri.ags.clusterers.supportClasses.Cluster;
 import com.esri.ags.events.DetailsEvent;
 import com.esri.ags.events.ExtentEvent;
 import com.esri.ags.events.LayerEvent;
 import com.esri.ags.events.QueryEvent;
 import com.esri.ags.events.TimeExtentEvent;
 import com.esri.ags.geometry.Extent;
+import com.esri.ags.geometry.MapPoint;
 import com.esri.ags.layers.Layer;
 import com.esri.ags.layers.supportClasses.LayerDetails;
 import com.esri.ags.samples.events.HeatMapEvent;
-import com.esri.ags.samples.geometry.HeatMapPoint;
 import com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict;
 import com.esri.ags.tasks.DetailsTask;
 import com.esri.ags.tasks.QueryTask;
@@ -40,16 +42,16 @@ import flash.events.Event;
 import flash.filters.BlurFilter;
 import flash.geom.Matrix;
 import flash.geom.Point;
-import flash.geom.Rectangle;
 import flash.utils.Dictionary;
 
+import mx.collections.ArrayList;
+import mx.collections.IList;
 import mx.events.FlexEvent;
 import mx.rpc.events.FaultEvent;
 
 //--------------------------------------
 //  Events
 //--------------------------------------
-
 /**
  * Dispatched when the ArcGISHeatMapLayer ends the getDetails process.
  *
@@ -68,8 +70,6 @@ import mx.rpc.events.FaultEvent;
  * @eventType HeatMapEvent.REFRESH_END
  */
 [Event(name="refreshEnd", type="com.esri.ags.samples.events.HeatMapEvent")]
-
-
 
 /**
  * Allows you to generate a client-side dynamic heatmap on the fly through querying a layer resource (points only) exposed by the ArcGIS Server REST API (available in ArcGIS Server 9.3 and above).
@@ -92,7 +92,7 @@ import mx.rpc.events.FaultEvent;
  * <listing version="3.0">
  * &lt;esri:Map&gt;
  *      &lt;layers:ArcGISHeatMapLayer id="heatMapLayer"
- *                                    outFields="[*]"
+ *                                    outFields="*"
  *                                    url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Earthquakes/Since_1970/MapServer/0"/&gt;
  * &lt;/esri:Map&gt;</listing>
  *
@@ -103,8 +103,6 @@ import mx.rpc.events.FaultEvent;
  * @see http://resources.arcgis.com/en/help/flex-api/apiref/com/esri/ags/events/TimeExtentEvent.html com.esri.ags.events.TimeExtentEvent
  * @see com.esri.ags.samples.events.HeatMapEvent
  * @see http://resources.arcgis.com/en/help/flex-api/apiref/com/esri/ags/layers/Layer.html com.esri.ags.layers.Layer
- *
- * @inheritDoc
  */
 public class ArcGISHeatMapLayer extends Layer
 {
@@ -122,17 +120,39 @@ public class ArcGISHeatMapLayer extends Layer
     private var _heatMapQueryTask:QueryTask;
     private var _heatMapQuery:Query = new Query();
 
-    private static const POINT:Point = new Point();
-    private var _dataProvider:Vector.<HeatMapPoint>;
-    private var _gradientDict:Array;
     private var _heatMapTheme:String = HeatMapGradientDict.RAINBOW_TYPE;
-    private var _heatRadius:Number = 25;
-    private var _bitmapDataLayer:BitmapData;
-    private const _blurFilter:BlurFilter = new BlurFilter(4, 4);
-    private var _centerValue:Number;
-    private const _shape:Shape = new Shape();
-    private const _x:Array = [];
-    private const _y:Array = [];
+    private var _dataProvider:IList;
+    private var _gradientDict:Array;
+    private var _bitmapData:BitmapData;
+
+    private static const POINT:Point = new Point();
+    private const BLURFILTER:BlurFilter = new BlurFilter(4, 4);
+    private var _densityRadius:int = 25;
+
+    //--------------------------------------------------------------------------
+    //
+    //  New Properties at 3.1
+    //
+    //--------------------------------------------------------------------------
+    private var _shape:Shape = new Shape();
+    private var _center:MapPoint;
+    private var _world:Number;
+    private var _wrapAround:Function;
+
+    private const _matrix1:Matrix = new Matrix();
+    private const _matrix2:Matrix = new Matrix();
+    private const COLORS:Array = [ 0, 0 ];
+    private const ALPHAS:Array = [ 1, 1 ];
+    private const RATIOS:Array = [ 0, 255 ];
+
+    private var _clusterCount:int = 0;
+    private var _clusterSize:int = 0;
+    private var _clusterMaxWeight:Number = 0.0;
+    private var _featureRadiusCalculator:Function = internalFeatureRadiusCalculator;
+    private var _clusterRadiusCalculator:Function = internalClusterRadiusCalculator;
+    private var _featureIndexCalculator:Function = internalFeatureCalculator;
+    private var _clusterIndexCalculator:Function = internalClusterCalculator;
+    private var _clusterWeightCalculator:Function = internalWeightCalculator;
 
     /**
      * Creates a new ArcGISHeatMapLayer object.
@@ -316,65 +336,13 @@ public class ArcGISHeatMapLayer extends Layer
         {
             dispatchEvent(new HeatMapEvent(HeatMapEvent.REFRESH_END, event.featureSet.features.length, event.featureSet));
 
-            var featureArr:Array = event.featureSet.features;
-            _dataProvider = new Vector.<HeatMapPoint>();
+            _dataProvider = new ArrayList(event.featureSet.features);
 
-            for (var i:int = 0; i < featureArr.length; i++)
-            {
-                if (featureArr[i].geometry)
-                {
-                    _dataProvider.push(new HeatMapPoint(featureArr[i].geometry.x, featureArr[i].geometry.y));
-                }
-            }
             setLoaded(true);
             invalidateLayer();
         }
     }
 
-    /**
-     * @private
-     */
-    private function updatePoints():void
-    {
-        _x.length = 0;
-        _y.length = 0;
-
-        var max:Number = 5.0;
-
-        const mapW:Number = map.width;
-        const mapH:Number = map.height;
-        const extW:Number = map.extent.width;
-        const extH:Number = map.extent.height;
-        const facX:Number = mapW / extW;
-        const facY:Number = mapH / extH;
-
-        const dict:Dictionary = new Dictionary(true);
-        for each (var heatMapPoint:HeatMapPoint in _dataProvider)
-        {
-            if (map.extent.containsXY(heatMapPoint.x, heatMapPoint.y))
-            {
-                const sx:Number = (heatMapPoint.x - map.extent.xmin) * facX;
-                const sy:Number = mapH - (heatMapPoint.y - map.extent.ymin) * facY;
-
-                _x.push(sx);
-                _y.push(sy);
-
-                const key:String = Math.round(sx) + "_" + Math.round(sy);
-                var val:Number = dict[key] as Number;
-                if (isNaN(val))
-                {
-                    val = heatMapPoint.weight;
-                }
-                else
-                {
-                    val += heatMapPoint.weight;
-                }
-                dict[key] = val;
-                max = Math.max(max, val);
-            }
-        }
-        _centerValue = Math.max(19.0, 255.0 / max);
-    } //end function
 
     /**
      * @private
@@ -392,70 +360,191 @@ public class ArcGISHeatMapLayer extends Layer
     //--------------------------------------
     // overridden methods 
     //--------------------------------------
+
     /**
      * @private
      */
     override protected function updateLayer():void
     {
-        updatePoints();
+        const mapW:Number = map.width;
+        const mapH:Number = map.height;
+        const extW:Number = map.extent.width;
+        const extH:Number = map.extent.height;
+        const facX:Number = mapW / extW;
+        const facY:Number = mapH / extH;
 
-        const heatDiameter:int = _heatRadius * 2;
-        const matrix1:Matrix = new Matrix();
-        matrix1.createGradientBox(heatDiameter, heatDiameter, 0, -_heatRadius, -_heatRadius);
-
-        _shape.graphics.clear();
-        _shape.graphics.beginGradientFill(GradientType.RADIAL, [ _centerValue, 0 ], [ 1, 1 ], [ 0, 255 ], matrix1);
-        _shape.graphics.drawCircle(0, 0, _heatRadius);
-        _shape.graphics.endFill();
-        _shape.cacheAsBitmap = true;
-
-        const bitmapDataShape:BitmapData = new BitmapData(_shape.width, _shape.height, true, 0x00000000);
-        const matrix2:Matrix = new Matrix();
-        matrix2.tx = _heatRadius;
-        matrix2.ty = _heatRadius;
-        bitmapDataShape.draw(_shape, matrix2);
-
-        const clip:Rectangle = new Rectangle(0, 0, map.width, map.height);
-
-        if (_bitmapDataLayer && _bitmapDataLayer.width !== map.width && _bitmapDataLayer.height !== map.height)
+        if (!_dataProvider)
         {
-            _bitmapDataLayer.dispose();
-            _bitmapDataLayer = null;
+            return;
         }
-        if (_bitmapDataLayer === null)
-        {
-            _bitmapDataLayer = new BitmapData(map.width, map.height, true, 0x00000000);
-        }
-        _bitmapDataLayer.lock();
-        _bitmapDataLayer.fillRect(clip, 0x00000000);
-        const len:int = _x.length;
-        for (var i:int = 0; i < len; i++)
-        {
-            matrix2.tx = _x[i] - _heatRadius;
-            matrix2.ty = _y[i] - _heatRadius;
-            _bitmapDataLayer.draw(bitmapDataShape, matrix2, null, BlendMode.SCREEN);
-        }
-        bitmapDataShape.dispose();
+        const len:int = _dataProvider.length;
 
-        // paletteMap leaves some artifacts unless we get rid of the blackest colors 
-        _bitmapDataLayer.threshold(_bitmapDataLayer, _bitmapDataLayer.rect, POINT, "<=", 0x00000003, 0x00000000, 0x000000FF, true);
+        var i:int, feature:Graphic, mapPoint:MapPoint, cluster:Cluster, radius:Number;
 
+        if (_bitmapData && (_bitmapData.width !== map.width || _bitmapData.height !== map.height))
+        {
+            _bitmapData.dispose();
+            _bitmapData = null;
+        }
+        if (_bitmapData === null)
+        {
+            _bitmapData = new BitmapData(map.width, map.height, true, 0x00000000);
+        }
+
+        _bitmapData.lock();
+
+        _bitmapData.fillRect(_bitmapData.rect, 0x00000000);
+
+        if (map.wrapAround180)
+        {
+            switch (map.spatialReference.wkid)
+            {
+                case 102113:
+                case 102100:
+                case 3857:
+                {
+                    _world = 2.0 * 20037508.342788905;
+                    break;
+                }
+                case 4326:
+                {
+                    _world = 2.0 * 180.0;
+                    break;
+                }
+                default:
+                {
+                    _world = 0.0;
+                }
+            }
+            _wrapAround = doWrapAround;
+        }
+        else
+        {
+            _world = 0.0;
+            _wrapAround = noWrapAround;
+        }
+
+        if (_clusterSize)
+        {
+            if (_center === null)
+            {
+                _center = map.extent.center;
+            }
+            var maxWeight:Number = Number.NEGATIVE_INFINITY;
+            const cellW:Number = _clusterSize * extW / mapW;
+            const cellH:Number = _clusterSize * extH / mapH;
+            const clusterDict:Dictionary = new Dictionary();
+            for (i = 0; i < len; i++)
+            {
+                feature = _dataProvider.getItemAt(i) as Graphic;
+                mapPoint = feature.geometry as MapPoint;
+                if (map.extent.containsXY(mapPoint.x, mapPoint.y))
+                {
+                    const gx:int = Math.floor((mapPoint.x - _center.x) / cellW);
+                    const gy:int = Math.floor((mapPoint.y - _center.y) / cellH);
+                    const gk:String = gx + ":" + gy;
+                    cluster = clusterDict[gk];
+                    if (cluster === null)
+                    {
+                        const cx:Number = gx * cellW + _center.x;
+                        const cy:Number = gy * cellH + _center.y;
+                        clusterDict[gk] = cluster = new Cluster(new MapPoint(cx, cy), _clusterWeightCalculator(feature), [ feature ]);
+                    }
+                    else
+                    {
+                        cluster.graphics.push(feature);
+                        cluster.weight += _clusterWeightCalculator(feature);
+                    }
+                    maxWeight = Math.max(maxWeight, cluster.weight);
+                }
+            }
+            var count:int = 0;
+            for each (cluster in clusterDict)
+            {
+                COLORS[0] = Math.max(0, Math.min(255, _clusterIndexCalculator(cluster, maxWeight)));
+                radius = _clusterRadiusCalculator(cluster, _densityRadius, maxWeight);
+                _wrapAround(cluster.center);
+                count++;
+            }
+
+            _clusterCount = count;
+            dispatchEvent(new Event("clusterCountChanged"));
+
+            _clusterMaxWeight = maxWeight;
+            dispatchEvent(new Event("clusterMaxWeightChanged"));
+        }
+        else
+        {
+            for (i = 0; i < len; i++)
+            {
+                feature = _dataProvider.getItemAt(i) as Graphic;
+                mapPoint = feature.geometry as MapPoint;
+                COLORS[0] = Math.max(0, Math.min(255, _featureIndexCalculator(feature)));
+                radius = _featureRadiusCalculator(feature, _densityRadius);
+                _wrapAround(mapPoint);
+            }
+        }
+        // paletteMap leaves some artifacts unless we get rid of the blackest colors
+        _bitmapData.threshold(_bitmapData, _bitmapData.rect, POINT, "<", 0x00000001, 0x00000000, 0x000000FF, true);
         // Replace the black and blue with the gradient. Blacker pixels will get their new colors from
         // the beginning of the gradientArray and bluer pixels will get their new colors from the end. 
-        _bitmapDataLayer.paletteMap(_bitmapDataLayer, _bitmapDataLayer.rect, POINT, null, null, _gradientDict, null);
-
+        //comment out the line below if you would like to see the heatmap without the palette applied, will be only blue and black
+        _bitmapData.paletteMap(_bitmapData, _bitmapData.rect, POINT, null, null, _gradientDict, null);
         // This blur filter makes the heat map looks quite smooth.
-        _bitmapDataLayer.applyFilter(_bitmapDataLayer, _bitmapDataLayer.rect, POINT, _blurFilter);
-        _bitmapDataLayer.unlock();
+        _bitmapData.applyFilter(_bitmapData, _bitmapData.rect, POINT, BLURFILTER);
 
-        const matrix3:Matrix = new Matrix(1.0, 0.0, 0.0, 1.0, parent.scrollRect.x, parent.scrollRect.y);
+        _bitmapData.unlock();
+
+        _matrix2.tx = parent.scrollRect.x;
+        _matrix2.ty = parent.scrollRect.y;
+
         graphics.clear();
-        graphics.beginBitmapFill(_bitmapDataLayer, matrix3, false, false);
+        graphics.beginBitmapFill(_bitmapData, _matrix2, false, false);
         graphics.drawRect(parent.scrollRect.x, parent.scrollRect.y, map.width, map.height);
         graphics.endFill();
 
+        function noWrapAround(mapPoint:MapPoint):void
+        {
+            if (map.extent.containsXY(mapPoint.x, mapPoint.y))
+            {
+                drawXY(mapPoint.x, mapPoint.y);
+            }
+        }
+
+        function doWrapAround(mapPoint:MapPoint):void
+        {
+            var x:Number = mapPoint.x;
+            while (x > map.extent.xmin)
+            {
+                drawXY(x, mapPoint.y);
+                x -= _world;
+            }
+            x = mapPoint.x + _world;
+            while (x < map.extent.xmax)
+            {
+                drawXY(x, mapPoint.y);
+                x += _world;
+            }
+        }
+
+        function drawXY(x:Number, y:Number):void
+        {
+            const diameter:int = radius + radius;
+
+            _matrix1.createGradientBox(diameter, diameter, 0, -radius, -radius);
+
+            _shape.graphics.clear();
+            _shape.graphics.beginGradientFill(GradientType.RADIAL, COLORS, ALPHAS, RATIOS, _matrix1);
+            _shape.graphics.drawCircle(0, 0, radius);
+            _shape.graphics.endFill();
+
+            _matrix2.tx = Math.floor((x - map.extent.xmin) * facX);
+            _matrix2.ty = Math.floor(mapH - (y - map.extent.ymin) * facY);
+            _bitmapData.draw(_shape, _matrix2, null, BlendMode.SCREEN, null, true);
+        }
         dispatchEvent(new LayerEvent(LayerEvent.UPDATE_END, this, null, true));
-    }
+
+    } //end updateLayer
 
     //--------------------------------------
     // Getters and setters 
@@ -617,7 +706,8 @@ public class ArcGISHeatMapLayer extends Layer
 
     [Bindable(event="timeExtentChanged")]
     /**
-     * The time instant or the time extent to query, this is usually set internally through a time extent change event when the map time changes and not set directly.
+     * The time instant or the time extent to query, this is usually set internally
+     * through a time extent change event when the map time changes and not set directly.
      */
     public function get timeExtent():TimeExtent
     {
@@ -643,9 +733,8 @@ public class ArcGISHeatMapLayer extends Layer
 
     [Bindable(event="heatMapThemeChanged")]
     /**
-     * The "named" color scheme used to generate the client-side heatmap layer.  See the
+     * The "named" color scheme used to generate the client-side heatmap layer.
      * @default RAINBOW
-     * @see com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict
      */
     public function get theme():String
     {
@@ -677,7 +766,175 @@ public class ArcGISHeatMapLayer extends Layer
         return _layerDetails;
     }
 
+    //--------------------------------------------------------------------------
+    //
+    //  New methods at 3.1
+    //
+    //--------------------------------------------------------------------------
 
+    //--------------------------------------
+    //  cluster max weight
+    //--------------------------------------
+
+    /**
+     * The maximum weight of the cluster.
+     */
+    [Bindable("clusterMaxWeightChanged")]
+    public function get clusterMaxWeight():Number
+    {
+        return _clusterMaxWeight;
+    }
+
+    //--------------------------------------
+    //  cluster count
+    //--------------------------------------
+
+    /**
+     * The cluster count.
+     */
+    [Bindable("clusterCountChanged")]
+    public function get clusterCount():int
+    {
+        return _clusterCount;
+    }
+
+    //--------------------------------------
+    //  cluster size
+    //--------------------------------------
+
+    /**
+     * The cluster size.
+     */
+    [Bindable]
+    public function get clusterSize():int
+    {
+        return _clusterSize;
+    }
+
+    /**
+     * @private
+     */
+    public function set clusterSize(value:int):void
+    {
+        if (_clusterSize !== value)
+        {
+            _clusterSize = value;
+            invalidateLayer();
+        }
+    }
+
+    //--------------------------------------
+    //  density radius
+    //--------------------------------------
+
+    /**
+     * The density radius.  This controls the size of the heat
+     * radius for a given point.
+     */
+    [Bindable]
+    public function get densityRadius():int
+    {
+        return _densityRadius;
+    }
+
+    /**
+     * @private
+     */
+    public function set densityRadius(value:int):void
+    {
+        if (_densityRadius !== value)
+        {
+            _densityRadius = value;
+            invalidateLayer();
+        }
+    }
+
+    //--------------------------------------------------------------------------
+    //
+    //  functions used to manipulate heatmap generation
+    //
+    //--------------------------------------------------------------------------
+
+    /**
+     * The function to use to calculate the density radius.
+     * If not set the heatmap layer will default to the internal function.
+     */
+    [Bindable(event="featureRadiusCalculatorChanged")]
+    public function set featureRadiusCalculator(value:Function):void
+    {
+        _featureRadiusCalculator = value === null ? internalFeatureRadiusCalculator : value;
+        invalidateLayer();
+    }
+
+    /**
+     * The function to use to calculate the index used to retrieve colors from
+     * the gradient dictionary.
+     * If not set the heatmap layer will default to the internal function.
+     */
+    [Bindable(event="featureIndexCalculatorChanged")]
+    public function set featureIndexCalculator(value:Function):void
+    {
+        _featureIndexCalculator = value === null ? internalFeatureCalculator : value;
+        invalidateLayer();
+    }
+
+    /**
+     * The function to use to calculate the cluster radius.
+     * If not set the heatmap layer will default to the internal function.
+     */
+    [Bindable(event="clusterRadiusCalculatorChanged")]
+    public function set clusterRadiusCalculator(value:Function):void
+    {
+        _clusterRadiusCalculator = value === null ? internalClusterRadiusCalculator : value;
+        invalidateLayer();
+    }
+
+    /**
+     * The function to use to calculate the cluster index.
+     * If not set the heatmap layer will default to the internal function.
+     */
+    [Bindable(event="clusterIndexCalculatorChanged")]
+    public function set clusterIndexCalculator(value:Function):void
+    {
+        _clusterIndexCalculator = value === null ? internalClusterCalculator : value;
+        invalidateLayer();
+    }
+
+    /**
+     * The function to use to calculate the cluster weight.
+     * If not set the heatmap layer will default to the internal function.
+     */
+    [Bindable(event="clusterWeightCalculatorChanged")]
+    public function set clusterWeightCalculator(value:Function):void
+    {
+        _clusterWeightCalculator = value === null ? internalWeightCalculator : value;
+        invalidateLayer();
+    }
+
+    private function internalWeightCalculator(feature:Graphic):Number
+    {
+        return 1.0;
+    }
+
+    private function internalFeatureCalculator(feature:Graphic):int
+    {
+        return 255;
+    }
+
+    private function internalClusterCalculator(cluster:Cluster, weightMax:Number):int
+    {
+        return 255 * cluster.weight / weightMax;
+    }
+
+    private function internalFeatureRadiusCalculator(feature:Graphic, radius:Number):Number
+    {
+        return radius;
+    }
+
+    private function internalClusterRadiusCalculator(cluster:Cluster, radius:Number, weightMax:Number):Number
+    {
+        return radius;
+    }
 
 } //end class
 }
