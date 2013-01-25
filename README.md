@@ -2,7 +2,8 @@
 
 This is the heat map widget source code compatible with the [arcgis-viewer-flex (ArcGIS Viewer for Flex)](https://github.com/Esri/arcgis-viewer-flex "View repository on GitHub") application.
 
-[![Heatmap widget](https://raw.github.com/Esri/heatmap-widget-flex/master/heatmap-widget-flex.png "HeatMap Widget")](http://serverapps101.esri.com/webapis/flex-viewer/flexviewer30/index.html?config=heatmap-config.xml)
+<!-- MAKE SURE TO ALWAYS UPDATE THE VERSION HERE -->
+[![Heatmap widget](https://raw.github.com/Esri/heatmap-widget-flex/master/heatmap-widget-flex.png "HeatMap Widget")](http://serverapps101.esri.com/webapis/flex-viewer/flexviewer31/index.html?config=heatmap-config.xml)
 
 This repository includes:
 
