@@ -111,6 +111,9 @@ The default component used for changing the heatmap widget layer's theme or colo
                 <fx:Object data="{HeatMapGradientDict.THERMAL_TYPE}"
                            icon="@Embed('../../../../../assets/images/i_thermal.png')"
                            label="Thermal"/>
+                <fx:Object data="{HeatMapGradientDict.CUSTOM_TYPE}"
+                           icon="@Embed('../../../../../assets/images/i_custom_theme.png')"
+                           label="Custom"/>
             </s:ArrayList>
         </s:dataProvider>
     </s:ButtonBar>
