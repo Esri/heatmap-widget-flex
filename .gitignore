@@ -1,28 +1,19 @@
-
-# Files to ignore for heatmap-widget-flex repository
-
-# Ant build project files
+# Ant build files
 env.properties
 local.properties
 
-# FlashBuilder project files
+# FlashBuilder files
 .actionScriptProperties
-/.settings/
+.settings/
 .flexProperties
 .flexLibProperties
 .project
 
-# Project directories
-/bin/
-/bin-debug/
-/bin-release/
-/build-widget-deps/
-/dist/
-/dist-widget/
-/doc/
-/docs/
-/html-template/
+# Build and Release directories
+bin/
+dist/
+docs/
 
 # Other file types
 *.sh
-*.zip
+*.bat
