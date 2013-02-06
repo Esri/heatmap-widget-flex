@@ -9,9 +9,10 @@ This repository includes:
 
 * The widget source code.
 * The ArcGISHeatMapLayer source code.
-* A few non-widget samples to showcase the ArcGISHeatMapLayer.
-* Read the [Change Log](./blob/master/CHANGELOG.md) for details on what's new.
-* Read the [Documentation](./wiki) for getting started using this repository.
+* The non-widget samples to showcase the ArcGISHeatMapLayer.
+* The [Change Log](./blob/master/CHANGELOG.md) containing details about the feature history.
+* The [Documentation](./wiki) for getting started using this repository.
+* The latest progress is always on the [develop branch](./tree/develop).
 
 ## Features
 * If you are wanting to produce a heat map layer in your ArcGIS Viewer for Flex application take a look at this widget.
