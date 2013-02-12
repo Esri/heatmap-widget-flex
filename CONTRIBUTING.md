@@ -6,9 +6,9 @@ There are many ways you can contribute to the [ArcGIS Viewer for Flex HeatMap Wi
 * Create and share your own (custom version) of the widget.
 * Contribute to the ArcGIS Viewer for Flex HeatMap Widget source code.
 
-This guide describes how you can contribute improvements to the ArcGIS Viewer for Flex source code.
+This guide describes how you can contribute improvements to the ArcGIS Viewer for Flex HeatMap Widget source code.
 
-The [ArcGIS Viewer for Flex HeatMap Widget](http://www.arcgis.com/home/item.html?id=43daf0ffb1d34e31ad752da1340aeb40) is a sample widget that was originally built by the Lloyd Heberlie at [Esri](http://www.esri.com) and has had many contributions from the Flex Team at [Esri](http://www.esri.com). We are excited that you are interested in improving the HeatMap Widget source code. This guide will help make sure your contribution (pull request) will be accepted and easily merged.
+The [ArcGIS Viewer for Flex HeatMap Widget](http://www.arcgis.com/home/item.html?id=43daf0ffb1d34e31ad752da1340aeb40) is a sample widget that was originally built by Lloyd Heberlie at [Esri](http://www.esri.com) and has had many contributions from the Flex Team at [Esri](http://www.esri.com). We are excited that you are interested in improving the HeatMap Widget source code. This guide will help make sure your contribution (pull request) will be accepted and easily merged.
 
 1. Make sure you have a [GitHub account](https://github.com/signup/free).
 2. [Fork](https://help.github.com/articles/fork-a-repo) the [HeatMap Widget repo](../../) on GitHub.
