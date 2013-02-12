@@ -1,3 +1,24 @@
+## Version 3.1
+---
+* Released January 10, 2013
+* New ArcGISHeatMapLayer class supporting:
+	* Custom color themes
+	* Density radius
+	* Clustering options
+	* Calculator functions to dynamically calculate density and clustering
+* Updated HeatMapGradientDict to support custom themes, including new function fillCustomPaletteMap to support calculating a heatmap theme based upon an array of hexidecimal colors.
+* Renamed ColorMatrixUtil.blackAndWhiteFilter to ColorMatrixUtil.blackAndWhite.
+* Updated HeatMapWidget
+	* Added user interface component to HeatMapThemeView to support custom color theme.
+	* Added user interface component to HeatMapWidget to support modifying heat map density radius.
+	* Added configuration options to support density radius and custom theme color.
+* Updated standalone samples (HeatMapTest.mxml, HeatMapTimeTest.mxml) to showcase new ArcGISHeatMapLayer functionality.
+* Source code now all on GitHub.
+	* New documentation on [Github wiki](../../wiki) for [Application Builder](../../wiki/Application-Builder) users and [Developers](../../wiki/Developers).
+* Flex Library Project support including [Ant build file](build.xml) to compile source code into a library swc and library documentation (asdoc).
+* Application Builder HeatMap widget is still available on [ArcGIS.com](http://www.arcgis.com/home/item.html?id=43daf0ffb1d34e31ad752da1340aeb40).
+* Developers: Requires Adobe Flex SDK 4.6.0 and ArcGIS API 3.1 for Flex
+
 ## Version 3.0
 
 * Released June 13, 2012

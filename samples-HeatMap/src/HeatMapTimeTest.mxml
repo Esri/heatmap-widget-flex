@@ -19,7 +19,8 @@
 <s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
                xmlns:s="library://ns.adobe.com/flex/spark"
                xmlns:esri="http://www.esri.com/2008/ags"
-               xmlns:samples="library://ns.esri.com/github/2013/flex/samples">
+               xmlns:samples="library://ns.esri.com/github/2013/flex/samples"
+               preinitialize="application_preinitializeHandler(event)">
     <fx:Script>
         <![CDATA[
             import com.esri.ags.events.DetailsEvent;
@@ -30,8 +31,15 @@
             import com.esri.ags.samples.utils.ColorMatrixUtil;
 
             import mx.collections.ArrayCollection;
+            import mx.events.FlexEvent;
 
             import spark.events.IndexChangeEvent;
+
+            protected function application_preinitializeHandler(event:FlexEvent):void
+            {
+                var customColors:Array = [ 0xEBED95, 0xEDB019, 0xD24F0B, 0xD21813, 0xBA5B6D ];
+                HeatMapGradientDict.fillCustomPaletteMap(customColors);
+            }
 
             protected function updateStartHandler(event:LayerEvent):void
             {
@@ -61,7 +69,7 @@
             protected function refreshStartHandler(event:HeatMapEvent):void
             {
                 trace("refreshStartHandler");
-                heatMapLayer.filters = [ ColorMatrixUtil.blackAndWhiteFilter ];
+                heatMapLayer.filters = [ ColorMatrixUtil.blackAndWhite ];
                 fadeEffectOut.play();
             }
 
@@ -166,10 +174,13 @@
         <s:NumberFormatter id="numberFormatter" fractionalDigits="2"/>
     </fx:Declarations>
 
-    <esri:Map id="map" timeSlider="{myTimeSlider}">
+    <esri:Map id="map"
+              timeSlider="{myTimeSlider}"
+              wrapAround180="true">
         <esri:ArcGISTiledMapServiceLayer url="http://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer"/>
         <samples:ArcGISHeatMapLayer id="heatMapLayer"
                                     alpha="0.7"
+                                    densityRadius="{densityRadius.value}"
                                     getDetailsComplete="getDetailsCompleteHandler(event)"
                                     isInScaleRangeChange="isInScaleRangeChangeHandler(event)"
                                     load="loadHandler(event)"
@@ -184,7 +195,7 @@
                                     where="Magnitude > 0"/>
     </esri:Map>
 
-    <s:Group width="330" height="250"
+    <s:Group width="330" height="300"
              right="20" top="20">
         <s:RectangularDropShadow left="0" right="0" top="0" bottom="0"
                                  alpha="1"
@@ -210,12 +221,20 @@
                   paddingLeft="10"
                   paddingRight="10"
                   paddingTop="10">
-
+            <s:HGroup width="100%">
+                <s:Label text="Density Radius:"/>
+                <s:HSlider id="densityRadius"
+                           maximum="50"
+                           minimum="10"
+                           value="15"/>
+            </s:HGroup>
             <s:ComboBox change="themeChangeHandler(event)" selectedIndex="0">
                 <s:ArrayList>
                     <fx:Object data="{HeatMapGradientDict.RAINBOW_TYPE}" label="Rainbow"/>
                     <fx:Object data="{HeatMapGradientDict.THERMAL_TYPE}" label="Thermal"/>
                     <fx:Object data="{HeatMapGradientDict.RED_WHITE_BLUE_TYPE}" label="Red, White, Blue"/>
+                    <fx:Object data="{HeatMapGradientDict.WEATHER_RADAR_TYPE}" label="Weather Radar"/>
+                    <fx:Object data="{HeatMapGradientDict.CUSTOM_TYPE}" label="Ring of Fire"/>
                 </s:ArrayList>
             </s:ComboBox>
             <esri:TimeSlider id="myTimeSlider"

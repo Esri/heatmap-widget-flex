@@ -52,7 +52,7 @@ public class ColorMatrixUtil
     /**
      * A black and white ColorMatrixFilter.
      */
-    public static function get blackAndWhiteFilter():ColorMatrixFilter
+    public static function get blackAndWhite():ColorMatrixFilter
     {
         return _bw;
     }
@@ -62,7 +62,7 @@ public class ColorMatrixUtil
      * @return
      *
      */
-    public static function get duskFilter():ColorMatrixFilter
+    public static function get dusk():ColorMatrixFilter
     {
         return _dusk;
     }

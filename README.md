@@ -2,15 +2,18 @@
 
 This is the heat map widget source code compatible with the [arcgis-viewer-flex (ArcGIS Viewer for Flex)](https://github.com/Esri/arcgis-viewer-flex "View repository on GitHub") application.
 
-[![Heatmap widget](https://raw.github.com/Esri/heatmap-widget-flex/master/heatmap-widget-flex.png "HeatMap Widget")](http://serverapps101.esri.com/webapis/flex-viewer/flexviewer30/index.html?config=heatmap-config.xml)
+<!-- MAKE SURE TO ALWAYS UPDATE THE VERSION HERE -->
+[![Heatmap widget](heatmap-widget-flex.png "HeatMap Widget")](http://serverapps101.esri.com/webapis/flex-viewer/flexviewer31/index.html?config=heatmap-config.xml)
 
 This repository includes:
 
 * The widget source code.
 * The ArcGISHeatMapLayer source code.
-* A few non-widget samples to showcase the ArcGISHeatMapLayer.
-* Read the [Change Log](https://github.com/Esri/heatmap-widget-flex/blob/master/CHANGELOG.md) for details on what's new.
-* Read the [Documentation](https://github.com/Esri/heatmap-widget-flex/wiki) for getting started using this repository.
+* The non-widget samples to showcase the ArcGISHeatMapLayer.
+* The [Change Log](CHANGELOG.md) containing details about the feature history.
+* The [Documentation](../../wiki) for getting started using this repository.
+* The latest development is always on the [develop branch](../../tree/develop).
+* The latest release is always on the [master branch](../../tree/master).
 
 ## Features
 * If you are wanting to produce a heat map layer in your ArcGIS Viewer for Flex application take a look at this widget.
@@ -21,9 +24,9 @@ This repository includes:
 ## Instructions
 What do you want to do with this widget?
 
-1.  If you are simply going to use the compiled "ready-to-use" version of the HeatMapWidget packaged for the [ArcGIS Viewer for Flex Application Builder](http://resources.arcgis.com/en/help/flex-viewer/concepts/index.html#//01m30000002v000000 "Getting started with Application Builder") proceed to the [documentation for Application Builder](https://github.com/Esri/heatmap-widget-flex/wiki/Application-Builder) section.
+1.  If you are simply going to use the compiled "ready-to-use" version of the HeatMapWidget packaged for the [ArcGIS Viewer for Flex Application Builder](http://resources.arcgis.com/en/help/flex-viewer/concepts/index.html#//01m30000002v000000 "Getting started with Application Builder") proceed to the [documentation for Application Builder](../../wiki/Application-Builder) section.
   
-2.  If you are going to compile this widget on your own, make modifications, etc., proceed to the [documentation for Developers](https://github.com/Esri/heatmap-widget-flex/wiki/Developers) section.
+2.  If you are going to compile this widget on your own, make modifications, etc., proceed to the [documentation for Developers](../../wiki/Developers) section.
 
 ## Requirements
 * Knowledge of Flex development.
@@ -41,7 +44,7 @@ What do you want to do with this widget?
 ## Issues
 Ask questions on the [HeatMapWidget Forum](http://forums.arcgis.com/threads/76049-heatmap-widget-flex "HeatMapWidget Forum")
 
-Find a bug or want to request a new feature?  Please let us know by [submitting an issue](https://github.com/Esri/heatmap-widget-flex/issues).
+Find a bug or want to request a new feature?  Please let us know by [submitting an issue](../../issues).
 
 ## Contributing
 Anyone and everyone is welcome to contribute.
@@ -61,4 +64,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-A copy of the license is available in the repository's [license.txt]( https://raw.github.com/Esri/heatmap-widget-flex/master/license.txt) file.
+A copy of the license is available in the repository's [license.txt](license.txt) file.
+
+[](Esri Tags: ArcGIS Web Flex Viewer Map Library API)
+[](Esri Language: ActionScript)

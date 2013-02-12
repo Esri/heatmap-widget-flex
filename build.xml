@@ -32,6 +32,10 @@
             depends="pre-build,clean-build-library,release-library,release-widget"
             description="Full build (library and widget)"/>
 
+    <target name="clean"
+            depends="clean-widget,clean-library"
+            description="Restores project to initial state before build (library and widget)"/>
+
     <target name="pre-build"
             depends="check-java-home,check-ant-home,check-flex-home,check-ags-api-home,check-ags-viewer-home"
             description="Check for the required environment variables for compilation."/>
