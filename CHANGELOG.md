@@ -1,5 +1,11 @@
+## Version 3.2
+
+* Released March 22, 2013
+* Updated build.properties to require ArcGIS API 3.2 for Flex.
+* Updated meta.xml, widget version and description to reflect version 3.2.
+
 ## Version 3.1
----
+
 * Released January 10, 2013
 * New ArcGISHeatMapLayer class supporting:
 	* Custom color themes
