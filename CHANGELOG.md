@@ -1,3 +1,9 @@
+## Version 3.3
+
+* Released May 14, 2013
+* Updated build.properties to require ArcGIS API 3.3 for Flex.
+* Updated meta.xml, widget version and description to reflect version 3.3.
+
 ## Version 3.2
 
 * Released March 22, 2013
