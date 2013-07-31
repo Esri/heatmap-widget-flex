@@ -109,6 +109,8 @@
             // TimeSlider variables
             //--------------------------------------
             [Bindable]
+            private var timeEnabledByDefault:Boolean = false;
+            [Bindable]
             private var sliderLoop:Boolean = false;
             [Bindable]
             private var sliderThumbCount:int = 1;
@@ -174,6 +176,7 @@
                         dateTimeFormatter.dateTimePattern = dateFormat;
                     }
                     sliderLoop = configXML.ui.timeslider.loop == "true";
+                    timeEnabledByDefault = configXML.ui.timeslider.enabled_by_default == "true";
                     if (!isNaN(parseInt(configXML.ui.timeslider.thumbcount)))
                     {
                         sliderThumbCount = parseInt(configXML.ui.timeslider.thumbcount);
@@ -277,6 +280,11 @@
             protected function getDetailsCompleteHandler(event:DetailsEvent):void
             {
                 timeInfo = event.layerDetails.timeInfo;
+                if (timeInfo && timeEnabledByDefault)
+                {
+                    timeToggleButton.selected = true;
+                    timeToggleButtonChangeHandler(null);
+                }
             }
 
             //--------------------------------------

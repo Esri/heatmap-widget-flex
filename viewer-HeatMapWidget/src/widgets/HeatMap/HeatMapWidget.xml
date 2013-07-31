@@ -52,6 +52,7 @@
             <featurecount_label> features contained</featurecount_label>
         </query>
         <timeslider>
+            <enabled_by_default>true</enabled_by_default>
             <loop>true</loop>
             <thumbcount>2</thumbcount>
             <thumbmovingrate>1200</thumbmovingrate>
