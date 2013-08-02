@@ -36,12 +36,15 @@
     <fx:Script>
         <![CDATA[
             import com.esri.ags.events.DetailsEvent;
+            import com.esri.ags.events.LayerEvent;
             import com.esri.ags.layers.supportClasses.TimeInfo;
             import com.esri.ags.samples.events.HeatMapEvent;
             import com.esri.ags.samples.layers.ArcGISHeatMapLayer;
             import com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict;
             import com.esri.ags.samples.utils.ColorMatrixUtil;
             import com.esri.ags.samples.utils.UIComponentUtil;
+
+            import mx.controls.Alert;
 
             import spark.events.IndexChangeEvent;
 
@@ -188,7 +191,8 @@
                 }
 
                 m_heatMapLayer = new ArcGISHeatMapLayer();
-                m_heatMapLayer.addEventListener(DetailsEvent.GET_DETAILS_COMPLETE, getDetailsCompleteHandler, false, 0, true);
+                m_heatMapLayer.addEventListener(LayerEvent.LOAD, heatmapLayerLoadHandler, false, 0, true);
+                m_heatMapLayer.addEventListener(LayerEvent.LOAD_ERROR, heatmapLayerLoadErrorHandler, false, 0, true);
                 m_heatMapLayer.addEventListener(HeatMapEvent.REFRESH_START, refreshStartHandler, false, 0, true);
                 m_heatMapLayer.addEventListener(HeatMapEvent.REFRESH_END, refreshEndHandler, false, 0, true);
                 m_heatMapLayer.url = heatmap_QueryURL;
@@ -277,14 +281,25 @@
                 }
             }
 
-            protected function getDetailsCompleteHandler(event:DetailsEvent):void
+            protected function heatmapLayerLoadHandler(event:LayerEvent):void
             {
-                timeInfo = event.layerDetails.timeInfo;
+                if (m_heatMapLayer.layerDetails)
+                {
+                    timeInfo = m_heatMapLayer.layerDetails.timeInfo;
+                }
                 if (timeInfo && timeEnabledByDefault)
                 {
                     timeToggleButton.selected = true;
                     timeToggleButtonChangeHandler(null);
                 }
+            }
+
+            protected function heatmapLayerLoadErrorHandler(event:LayerEvent):void
+            {
+                errorString = "Some possible reasons are:\n\n" + event.fault.faultString + "\n" + event.fault.faultDetail;
+                Alert.show(errorString, "Well that was embarrasing ...");
+                isRefreshing = false;
+                loadingMessage.showMessage("", false);
             }
 
             //--------------------------------------
