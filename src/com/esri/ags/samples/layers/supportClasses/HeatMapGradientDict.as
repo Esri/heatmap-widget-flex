@@ -23,7 +23,10 @@ import flash.display.Shape;
 import flash.geom.Matrix;
 
 /**
- * Contains pregenerated arrays that can be used as a HeatMap's gradientArray, used by the ArcGISHeatMapLayer to set the heatmap theme.
+ * Contains pregenerated arrays that are used by the HeatMap's internal gradientArray, when setting the theme on the ArcGISHeatMapLayer.
+ * The fillCustomPaletteMap method may also be used to populate the "CUSTOM_TYPE" theme using an array of color values.
+ *
+ * @see com.esri.ags.samples.layers.ArcGISHeatMapLayer#theme
  */
 public class HeatMapGradientDict
 {
