@@ -16,19 +16,16 @@
 package com.esri.ags.samples.layers
 {
 
+import com.esri.ags.FeatureSet;
 import com.esri.ags.Graphic;
 import com.esri.ags.TimeExtent;
 import com.esri.ags.clusterers.supportClasses.Cluster;
-import com.esri.ags.events.DetailsEvent;
-import com.esri.ags.events.ExtentEvent;
 import com.esri.ags.events.LayerEvent;
-import com.esri.ags.events.QueryEvent;
 import com.esri.ags.events.TimeExtentEvent;
 import com.esri.ags.geometry.Extent;
 import com.esri.ags.geometry.MapPoint;
 import com.esri.ags.layers.Layer;
 import com.esri.ags.layers.supportClasses.LayerDetails;
-import com.esri.ags.samples.events.HeatMapEvent;
 import com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict;
 import com.esri.ags.tasks.DetailsTask;
 import com.esri.ags.tasks.QueryTask;
@@ -39,6 +36,7 @@ import flash.display.BlendMode;
 import flash.display.GradientType;
 import flash.display.Shape;
 import flash.events.Event;
+import flash.filters.BitmapFilterQuality;
 import flash.filters.BlurFilter;
 import flash.geom.Matrix;
 import flash.geom.Point;
@@ -46,30 +44,8 @@ import flash.utils.Dictionary;
 
 import mx.collections.ArrayList;
 import mx.collections.IList;
-import mx.events.FlexEvent;
-import mx.rpc.events.FaultEvent;
-
-//--------------------------------------
-//  Events
-//--------------------------------------
-/**
- * Dispatched when the ArcGISHeatMapLayer ends the getDetails process.
- *
- * @eventType DetailsEvent.GET_DETAILS_COMPLETE
- */
-[Event(name="getDetailsComplete", type="com.esri.ags.events.DetailsEvent")]
-/**
- * Dispatched when the ArcGISHeatMapLayer starts the refresh process.
- *
- * @eventType HeatMapEvent.REFRESH_START
- */
-[Event(name="refreshStart", type="com.esri.ags.samples.events.HeatMapEvent")]
-/**
- * Dispatched when the ArcGISHeatMapLayer ends the refresh process.
- *
- * @eventType HeatMapEvent.REFRESH_END
- */
-[Event(name="refreshEnd", type="com.esri.ags.samples.events.HeatMapEvent")]
+import mx.rpc.AsyncResponder;
+import mx.rpc.Fault;
 
 /**
  * Allows you to generate a client-side dynamic heatmap on the fly through querying a layer resource (points only) exposed by the ArcGIS Server REST API (available in ArcGIS Server 9.3 and above).
@@ -92,48 +68,48 @@ import mx.rpc.events.FaultEvent;
  * <listing version="3.0">
  * &lt;esri:Map&gt;
  *      &lt;layers:ArcGISHeatMapLayer id="heatMapLayer"
- *                                    outFields="*"
+ *                                    outFields="&#42;"
  *                                    url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Earthquakes/Since_1970/MapServer/0"/&gt;
  * &lt;/esri:Map&gt;</listing>
  *
- * @see http://resources.arcgis.com/en/help/flex-api/apiref/com/esri/ags/events/DetailsEvent.html com.esri.ags.events.DetailsEvent
- * @see http://resources.arcgis.com/en/help/flex-api/apiref/com/esri/ags/events/ExtentEvent.html com.esri.ags.events.ExtentEvent
- * @see http://resources.arcgis.com/en/help/flex-api/apiref/com/esri/ags/events/LayerEvent.html  com.esri.ags.events.LayerEvent
- * @see http://resources.arcgis.com/en/help/flex-api/apiref/com/esri/ags/events/QueryEvent.html com.esri.ags.events.QueryEvent
- * @see http://resources.arcgis.com/en/help/flex-api/apiref/com/esri/ags/events/TimeExtentEvent.html com.esri.ags.events.TimeExtentEvent
- * @see com.esri.ags.samples.events.HeatMapEvent
- * @see http://resources.arcgis.com/en/help/flex-api/apiref/com/esri/ags/layers/Layer.html com.esri.ags.layers.Layer
+ * @see https://developers.arcgis.com/en/flex/api-reference/index.html?com/esri/ags/FeatureSet.html&com/esri/ags/class-list.html com.esri.ags.FeatureSet
+ * @see https://developers.arcgis.com/en/flex/api-reference/index.html?com/esri/ags/events/LayerEvent.html&com/esri/ags/events/class-list.html com.esri.ags.events.LayerEvent
+ * @see https://developers.arcgis.com/en/flex/api-reference/index.html?com/esri/ags/layers/Layer.html&com/esri/ags/layers/class-list.html com.esri.ags.layers.Layer
+ *
+ * @see http://developers.arcgis.com/en/flex/sample-code/heatmap.htm Live sample - HeatMap layer
+ * @see http://developers.arcgis.com/en/flex/sample-code/heatmap-weighted.htm Live sample - Weighted HeatMap layer (uses calculator functions)
+ * @see http://esri.github.io/heatmap-widget-flex Live sample - ArcGIS Viewer for Flex HeatMap Widget
  */
 public class ArcGISHeatMapLayer extends Layer
 {
+    private var _urlChanged:Boolean = false;
+    private var _themeChanged:Boolean = false;
+
     private var _url:String;
+    private var _urlService:String;
+    private var _urlLayerID:String;
     private var _where:String = "1=1";
-    private var _useAMF:Boolean = false;
+    private var _useAMF:Boolean = true;
     private var _proxyURL:String;
     private var _token:String;
     private var _outFields:Array;
     private var _timeExtent:TimeExtent;
-    private var _urlPartsArray:Array;
-    private var _detailsTask:DetailsTask;
     private var _layerDetails:LayerDetails;
+    private var _featureCount:int;
+    private var _featureSet:FeatureSet;
 
-    private var _heatMapQueryTask:QueryTask;
+    private var _heatMapQueryTask:QueryTask = new QueryTask();
     private var _heatMapQuery:Query = new Query();
 
     private var _heatMapTheme:String = HeatMapGradientDict.RAINBOW_TYPE;
     private var _dataProvider:IList;
-    private var _gradientDict:Array;
+    private var _gradientArray:Array;
     private var _bitmapData:BitmapData;
 
     private static const POINT:Point = new Point();
-    private const BLURFILTER:BlurFilter = new BlurFilter(4, 4);
+    private const BLURFILTER:BlurFilter = new BlurFilter(4, 4, BitmapFilterQuality.LOW);
     private var _densityRadius:int = 25;
 
-    //--------------------------------------------------------------------------
-    //
-    //  New Properties at 3.1
-    //
-    //--------------------------------------------------------------------------
     private var _shape:Shape = new Shape();
     private var _center:MapPoint;
     private var _world:Number;
@@ -164,122 +140,145 @@ public class ArcGISHeatMapLayer extends Layer
      */
     public function ArcGISHeatMapLayer(url:String = null, proxyUrl:String = null, token:String = null)
     {
+        super();
+
         mouseEnabled = false;
         mouseChildren = false;
-        super();
-        addEventListener(FlexEvent.CREATION_COMPLETE, creationCompleteHandler, false, 0, true);
-        addEventListener(LayerEvent.UPDATE_START, updateStartCompleteHandler, false, 0, true);
-        addEventListener(Event.REMOVED, removeCompleteHandler, false, 0, true);
-        _url = url;
-        _proxyURL = proxyURL;
-        _token = token;
-        _gradientDict = HeatMapGradientDict.gradientArray(_heatMapTheme);
+
+        this.url = url;
+        this.proxyURL = proxyURL;
+        this.token = token;
+        _gradientArray = HeatMapGradientDict.gradientArray(_heatMapTheme);
     }
+
+    //--------------------------------------------------------------------------
+    //
+    // Internal override functions
+    //
+    //--------------------------------------------------------------------------
 
     /**
      * @private
      */
-    protected function getDetailsCompleteHandler(event:DetailsEvent):void
+    override protected function addMapListeners():void
     {
-        _detailsTask.removeEventListener(DetailsEvent.GET_DETAILS_COMPLETE, getDetailsCompleteHandler);
-        if (event)
-        {
-            _layerDetails = event.layerDetails;
-        }
-        invalidateHeatMap();
-        dispatchEvent(event);
-    }
+        super.addMapListeners();
 
-    /**
-     * @private
-     */
-    protected function getDetailsFaultHandler(event:FaultEvent):void
-    {
-        _detailsTask.removeEventListener(FaultEvent.FAULT, getDetailsFaultHandler);
-        dispatchEvent(new LayerEvent(LayerEvent.LOAD_ERROR, this, event.fault));
-    }
-
-    /**
-     * @private
-     */
-    protected function updateStartCompleteHandler(event:LayerEvent):void
-    {
-        removeEventListener(LayerEvent.UPDATE_START, updateStartCompleteHandler);
         if (map)
         {
-            map.addEventListener(ExtentEvent.EXTENT_CHANGE, heatMapExtentChangeHandler);
             map.addEventListener(TimeExtentEvent.TIME_EXTENT_CHANGE, timeExtentChangeHandler);
         }
-        _heatMapQueryTask = new QueryTask(_url);
-        _heatMapQueryTask.addEventListener(QueryEvent.EXECUTE_COMPLETE, heatMapQueryCompleteHandler, false, 0, true);
-        _heatMapQueryTask.addEventListener(FaultEvent.FAULT, heatMapQueryFaultHandler, false, 0, true);
-        parseURL(_url);
-        if (_urlPartsArray.length == 2)
-        {
-            _detailsTask = new DetailsTask(_urlPartsArray[0]);
-            var layerID:Number = Number(_urlPartsArray[1]);
-            _detailsTask.addEventListener(DetailsEvent.GET_DETAILS_COMPLETE, getDetailsCompleteHandler, false, 0, true);
-            _detailsTask.addEventListener(FaultEvent.FAULT, getDetailsFaultHandler, false, 0, true);
-            _detailsTask.getDetails(layerID);
-        }
     }
 
     /**
-     * @private
-     */
-    protected function removeCompleteHandler(event:Event):void
+      * @private
+      */
+    override protected function removeMapListeners():void
     {
+        super.removeMapListeners();
+
         if (this.map)
         {
-            map.removeEventListener(ExtentEvent.EXTENT_CHANGE, heatMapExtentChangeHandler);
             map.removeEventListener(TimeExtentEvent.TIME_EXTENT_CHANGE, timeExtentChangeHandler);
         }
-        removeEventListener(Event.REMOVED, removeCompleteHandler);
-        _heatMapQueryTask.removeEventListener(QueryEvent.EXECUTE_COMPLETE, heatMapQueryCompleteHandler);
-        _heatMapQueryTask.removeEventListener(FaultEvent.FAULT, heatMapQueryFaultHandler);
     }
 
     /**
      * @private
      */
-    protected function creationCompleteHandler(event:FlexEvent):void
+    override protected function commitProperties():void
     {
-        removeEventListener(FlexEvent.CREATION_COMPLETE, creationCompleteHandler);
-        setLoaded(true);
-    }
+        super.commitProperties();
 
-    /**
-     * @private
-     */
-    protected function invalidateHeatMap():void
-    {
-        if (map && map.extent)
+        if (_urlChanged)
         {
-            generateHeatMap(map.extent);
+            _urlChanged = false;
+
+            removeAllChildren();
+            loadHeatMapServiceInfo();
+        }
+
+        if (_themeChanged)
+        {
+            _themeChanged = false;
+            redrawHeatMapLayer();
         }
     }
 
     /**
      * @private
      */
-    protected function generateHeatMap(extent:Extent):void
+    override protected function removeAllChildren():void
     {
-        if (_proxyURL)
+        super.removeAllChildren();
+
+        this.graphics.clear();
+    }
+
+    /**
+     * @private
+     */
+    override protected function updateLayer():void
+    {
+        //get new data
+        getHeatMapLayerData(map.extent);
+    }
+
+    //--------------------------------------------------------------------------
+    //
+    // private internal heatmap functions called by main layer functions
+    //
+    //--------------------------------------------------------------------------
+
+    /**
+    * @private
+    */
+    protected function timeExtentChangeHandler(event:TimeExtentEvent):void
+    {
+        this.timeExtent = event.timeExtent;
+    }
+
+    private function loadHeatMapServiceInfo():void
+    {
+        parseURL();
+        var _detailsTask:DetailsTask = new DetailsTask(_urlService);
+        var layerID:Number = Number(_urlLayerID);
+        _detailsTask.getDetails(layerID, new AsyncResponder(getDetailsCompleteHandler, getDetailsFaultHandler, url));
+
+        function getDetailsCompleteHandler(result:Object, token:Object = null):void
         {
-            _heatMapQueryTask.proxyURL = _proxyURL;
+            if (token == url) // make sure result is for the current url
+            {
+                _layerDetails = result as LayerDetails;
+                if (_layerDetails)
+                {
+                    //Will cause parent class (Layer) to dispatch LayerEvent.LOAD
+                    setLoaded(true);
+                    //will cause updateLayer to be called
+                    invalidateLayer();
+                }
+            }
         }
-        if (_token)
+
+        function getDetailsFaultHandler(error:Object, token:Object = null):void
         {
-            _heatMapQueryTask.token = _token;
+            dispatchEvent(new LayerEvent(LayerEvent.LOAD_ERROR, this, error as Fault));
+            setLoaded(false);
         }
+    }
+
+    private function getHeatMapLayerData(extent:Extent):void
+    {
+        _heatMapQueryTask = new QueryTask(this.url);
+        _heatMapQueryTask.proxyURL = _proxyURL;
+        _heatMapQueryTask.token = _token;
         _heatMapQueryTask.useAMF = _useAMF;
-        if (_where)
-        {
-            _heatMapQuery.where = _where;
-        }
+        _heatMapQuery.where = _where;
         _heatMapQuery.geometry = extent;
+        _heatMapQuery.timeExtent = _timeExtent;
         _heatMapQuery.returnGeometry = true;
         _heatMapQuery.outSpatialReference = map.spatialReference;
+
         if (_outFields)
         {
             _heatMapQuery.outFields = _outFields;
@@ -289,82 +288,27 @@ public class ArcGISHeatMapLayer extends Layer
             _heatMapQuery.outFields = [ '*' ];
         }
 
-        if (_timeExtent)
+        _heatMapQueryTask.execute(_heatMapQuery, new AsyncResponder(heatMapQueryCompleteHandler, heatMapQueryFaultHandler, url));
+        var thisLayer:ArcGISHeatMapLayer = this;
+        function heatMapQueryCompleteHandler(result:Object, token:Object):void
         {
-            _heatMapQuery.timeExtent = _timeExtent;
+            if (token == url) // make sure result is for the current url
+            {
+                var _featureSet:FeatureSet = result as FeatureSet;
+                _featureCount = _featureSet.features.length;
+                _dataProvider = new ArrayList(_featureSet.features);
+                redrawHeatMapLayer();
+                dispatchEvent(new LayerEvent(LayerEvent.UPDATE_END, thisLayer, null, true));
+            }
         }
 
-        dispatchEvent(new HeatMapEvent(HeatMapEvent.REFRESH_START));
-        if (visible)
+        function heatMapQueryFaultHandler(error:Object, token:Object = null):void
         {
-            _heatMapQueryTask.execute(_heatMapQuery);
-        }
-    }
-
-    /**
-     * @private
-     */
-    protected function timeExtentChangeHandler(event:TimeExtentEvent):void
-    {
-        _timeExtent = event.timeExtent;
-        invalidateHeatMap();
-    }
-
-    /**
-     * @private
-     */
-    protected function heatMapExtentChangeHandler(event:ExtentEvent):void
-    {
-        // Perform the query, when queryComplete occurs call invalidateLayer()
-        generateHeatMap(event.extent);
-    }
-
-    /**
-     * @private
-     */
-    protected function heatMapQueryFaultHandler(event:FaultEvent):void
-    {
-        dispatchEvent(new LayerEvent(LayerEvent.LOAD_ERROR, this, event.fault));
-    }
-
-    /**
-     * @private
-     */
-    protected function heatMapQueryCompleteHandler(event:QueryEvent):void
-    {
-        if (event)
-        {
-            dispatchEvent(new HeatMapEvent(HeatMapEvent.REFRESH_END, event.featureSet.features.length, event.featureSet));
-
-            _dataProvider = new ArrayList(event.featureSet.features);
-
-            setLoaded(true);
-            invalidateLayer();
+            dispatchEvent(new LayerEvent(LayerEvent.UPDATE_END, thisLayer, error as Fault, false));
         }
     }
 
-
-    /**
-     * @private
-     */
-    private function parseURL(value:String):void
-    {
-        _urlPartsArray = [];
-        var parseString:String = value;
-        var lastPos:int = parseString.lastIndexOf("/");
-        _urlPartsArray[0] = parseString.substr(0, lastPos);
-        _urlPartsArray[1] = parseString.substr(lastPos + 1);
-    }
-
-
-    //--------------------------------------
-    // overridden methods 
-    //--------------------------------------
-
-    /**
-     * @private
-     */
-    override protected function updateLayer():void
+    private function redrawHeatMapLayer():void
     {
         const mapW:Number = map.width;
         const mapH:Number = map.height;
@@ -463,7 +407,7 @@ public class ArcGISHeatMapLayer extends Layer
             {
                 COLORS[0] = Math.max(0, Math.min(255, _clusterIndexCalculator(cluster, maxWeight)));
                 radius = _clusterRadiusCalculator(cluster, _densityRadius, maxWeight);
-                _wrapAround(cluster.center);
+                _wrapAround(cluster.center, radius, facX, facY, mapH);
                 count++;
             }
 
@@ -481,7 +425,7 @@ public class ArcGISHeatMapLayer extends Layer
                 mapPoint = feature.geometry as MapPoint;
                 COLORS[0] = Math.max(0, Math.min(255, _featureIndexCalculator(feature)));
                 radius = _featureRadiusCalculator(feature, _densityRadius);
-                _wrapAround(mapPoint);
+                _wrapAround(mapPoint, radius, facX, facY, mapH);
             }
         }
         // paletteMap leaves some artifacts unless we get rid of the blackest colors
@@ -489,7 +433,7 @@ public class ArcGISHeatMapLayer extends Layer
         // Replace the black and blue with the gradient. Blacker pixels will get their new colors from
         // the beginning of the gradientArray and bluer pixels will get their new colors from the end. 
         //comment out the line below if you would like to see the heatmap without the palette applied, will be only blue and black
-        _bitmapData.paletteMap(_bitmapData, _bitmapData.rect, POINT, null, null, _gradientDict, null);
+        _bitmapData.paletteMap(_bitmapData, _bitmapData.rect, POINT, null, null, _gradientArray, null);
         // This blur filter makes the heat map looks quite smooth.
         _bitmapData.applyFilter(_bitmapData, _bitmapData.rect, POINT, BLURFILTER);
 
@@ -502,413 +446,59 @@ public class ArcGISHeatMapLayer extends Layer
         graphics.beginBitmapFill(_bitmapData, _matrix2, false, false);
         graphics.drawRect(parent.scrollRect.x, parent.scrollRect.y, map.width, map.height);
         graphics.endFill();
-
-        function noWrapAround(mapPoint:MapPoint):void
-        {
-            if (map.extent.containsXY(mapPoint.x, mapPoint.y))
-            {
-                drawXY(mapPoint.x, mapPoint.y);
-            }
-        }
-
-        function doWrapAround(mapPoint:MapPoint):void
-        {
-            var x:Number = mapPoint.x;
-            while (x > map.extent.xmin)
-            {
-                drawXY(x, mapPoint.y);
-                x -= _world;
-            }
-            x = mapPoint.x + _world;
-            while (x < map.extent.xmax)
-            {
-                drawXY(x, mapPoint.y);
-                x += _world;
-            }
-        }
-
-        function drawXY(x:Number, y:Number):void
-        {
-            const diameter:int = radius + radius;
-
-            _matrix1.createGradientBox(diameter, diameter, 0, -radius, -radius);
-
-            _shape.graphics.clear();
-            _shape.graphics.beginGradientFill(GradientType.RADIAL, COLORS, ALPHAS, RATIOS, _matrix1);
-            _shape.graphics.drawCircle(0, 0, radius);
-            _shape.graphics.endFill();
-
-            _matrix2.tx = Math.floor((x - map.extent.xmin) * facX);
-            _matrix2.ty = Math.floor(mapH - (y - map.extent.ymin) * facY);
-            _bitmapData.draw(_shape, _matrix2, null, BlendMode.SCREEN, null, true);
-        }
-        dispatchEvent(new LayerEvent(LayerEvent.UPDATE_END, this, null, true));
-
-    } //end updateLayer
-
-    //--------------------------------------
-    // Getters and setters 
-    //--------------------------------------
-
-    //--------------------------------------
-    //  url
-    //--------------------------------------
-
-    [Bindable(event="urlChanged")]
-    /**
-     * URL of the point layer in feature or map service that will be used to generate the heatmap.
-     */
-    public function get url():String
-    {
-        return _url;
     }
 
-    /**
-     * @private
-     */
-    public function set url(value:String):void
+    private function noWrapAround(mapPoint:MapPoint, radius:Number, facX:Number, facY:Number, mapH:Number):void
     {
-        if (_url != value && value)
+        if (map.extent.containsXY(mapPoint.x, mapPoint.y))
         {
-            _url = value;
-            invalidateHeatMap();
-            setLoaded(false);
-            dispatchEvent(new Event("urlChanged"));
+            drawXY(mapPoint.x, mapPoint.y, radius, facX, facY, mapH);
         }
     }
 
-    //--------------------------------------
-    //  proxyURL
-    //--------------------------------------
-
-    /**
-     * The URL to proxy the request through.
-     */
-    public function get proxyURL():String
+    private function doWrapAround(mapPoint:MapPoint, radius:Number, facX:Number, facY:Number, mapH:Number):void
     {
-        return _proxyURL;
-    }
-
-    /**
-     * @private
-     */
-    public function set proxyURL(value:String):void
-    {
-        _proxyURL = value;
-    }
-
-    //--------------------------------------
-    //  token
-    //--------------------------------------
-
-    [Bindable(event="tokenChanged")]
-    /**
-     * Token for accessing a secure ArcGIS service.
-     *
-     */
-    public function get token():String
-    {
-        return _token;
-    }
-
-    /**
-     * @private
-     */
-    public function set token(value:String):void
-    {
-        if (_token !== value)
+        var x:Number = mapPoint.x;
+        while (x > map.extent.xmin)
         {
-            _token = value;
-            dispatchEvent(new Event("tokenChanged"));
+            drawXY(x, mapPoint.y, radius, facX, facY, mapH);
+            x -= _world;
+        }
+        x = mapPoint.x + _world;
+        while (x < map.extent.xmax)
+        {
+            drawXY(x, mapPoint.y, radius, facX, facY, mapH);
+            x += _world;
         }
     }
 
-    //--------------------------------------
-    //  useAMF
-    //--------------------------------------
-
-    [Bindable(event="useAMFChanged")]
-    /**
-     * Use AMF for executing the query. This is the preferred method, but the server must support it.
-     */
-    public function get useAMF():Boolean
+    private function drawXY(x:Number, y:Number, radius:Number, facX:Number, facY:Number, mapH:Number):void
     {
-        return _useAMF;
+        const diameter:int = radius + radius;
+
+        _matrix1.createGradientBox(diameter, diameter, 0, -radius, -radius);
+
+        _shape.graphics.clear();
+        _shape.graphics.beginGradientFill(GradientType.RADIAL, COLORS, ALPHAS, RATIOS, _matrix1);
+        _shape.graphics.drawCircle(0, 0, radius);
+        _shape.graphics.endFill();
+
+        _matrix2.tx = Math.floor((x - map.extent.xmin) * facX);
+        _matrix2.ty = Math.floor(mapH - (y - map.extent.ymin) * facY);
+        _bitmapData.draw(_shape, _matrix2, null, BlendMode.SCREEN, null, true);
     }
 
-    /**
-     * @private
-     */
-    public function set useAMF(value:Boolean):void
-    {
-        if (_useAMF !== value)
-        {
-            _useAMF = value;
-            dispatchEvent(new Event("useAMFChanged"));
-        }
-    }
-
-    //--------------------------------------
-    //  where
-    //--------------------------------------
-
-    [Bindable(event="whereChanged")]
-    /**
-     * A where clause for the query, refer to the Query class in the ArcGIS API for Flex documentation.
-     * @default 1=1
-     */
-    public function get where():String
-    {
-        return _where;
-    }
 
     /**
-     * @private
+     * Split the main service url into its MapServer or FeatureServer part
+     * and then the layer id in the map service or feature service.
      */
-    public function set where(value:String):void
+    private function parseURL():void
     {
-        if (_where !== value)
-        {
-            _where = value;
-            invalidateHeatMap();
-            dispatchEvent(new Event("whereChanged"));
-        }
-    }
-
-    //--------------------------------------
-    //  outFields
-    //--------------------------------------
-
-    [Bindable(event="outFieldsChanged")]
-    /**
-     * Attribute fields to include in the FeatureSet returned in the HeatMapEvent.
-     */
-    public function get outFields():Array
-    {
-        return _outFields;
-    }
-
-    /**
-     * @private
-     */
-    public function set outFields(value:Array):void
-    {
-        if (_outFields !== value)
-        {
-            _outFields = value;
-            dispatchEvent(new Event("outFieldsChanged"));
-        }
-    }
-
-    //--------------------------------------
-    //  timeExtent
-    //--------------------------------------
-
-    [Bindable(event="timeExtentChanged")]
-    /**
-     * The time instant or the time extent to query, this is usually set internally
-     * through a time extent change event when the map time changes and not set directly.
-     */
-    public function get timeExtent():TimeExtent
-    {
-        return _timeExtent;
-    }
-
-    /**
-     * @private
-     */
-    public function set timeExtent(value:TimeExtent):void
-    {
-        if (_timeExtent !== value)
-        {
-            _timeExtent = value;
-            invalidateHeatMap();
-            dispatchEvent(new Event("timeExtentChanged"));
-        }
-    }
-
-    //--------------------------------------
-    //  theme
-    //--------------------------------------
-
-    [Bindable(event="heatMapThemeChanged")]
-    /**
-     * The "named" color scheme used to generate the client-side heatmap layer.
-     * @default RAINBOW
-     */
-    public function get theme():String
-    {
-        return _heatMapTheme;
-    }
-
-    /**
-     * @private
-     */
-    public function set theme(value:String):void
-    {
-        if (_heatMapTheme !== value)
-        {
-            _heatMapTheme = value;
-            _gradientDict = HeatMapGradientDict.gradientArray(_heatMapTheme);
-            refresh();
-            dispatchEvent(new Event("heatMapThemeChanged"));
-        }
-    }
-
-    /**
-     * Gets the detailed information for the ArcGIS layer used to generate the heatmap.
-     *
-     * @return The <code>LayerDetails</code> of the point layer being queried in the map or feature service.
-     *
-     */
-    public function get layerDetails():LayerDetails
-    {
-        return _layerDetails;
-    }
-
-    //--------------------------------------------------------------------------
-    //
-    //  New methods at 3.1
-    //
-    //--------------------------------------------------------------------------
-
-    //--------------------------------------
-    //  cluster max weight
-    //--------------------------------------
-
-    /**
-     * The maximum weight of the cluster.
-     */
-    [Bindable("clusterMaxWeightChanged")]
-    public function get clusterMaxWeight():Number
-    {
-        return _clusterMaxWeight;
-    }
-
-    //--------------------------------------
-    //  cluster count
-    //--------------------------------------
-
-    /**
-     * The cluster count.
-     */
-    [Bindable("clusterCountChanged")]
-    public function get clusterCount():int
-    {
-        return _clusterCount;
-    }
-
-    //--------------------------------------
-    //  cluster size
-    //--------------------------------------
-
-    /**
-     * The cluster size.
-     */
-    [Bindable]
-    public function get clusterSize():int
-    {
-        return _clusterSize;
-    }
-
-    /**
-     * @private
-     */
-    public function set clusterSize(value:int):void
-    {
-        if (_clusterSize !== value)
-        {
-            _clusterSize = value;
-            invalidateLayer();
-        }
-    }
-
-    //--------------------------------------
-    //  density radius
-    //--------------------------------------
-
-    /**
-     * The density radius.  This controls the size of the heat
-     * radius for a given point.
-     */
-    [Bindable]
-    public function get densityRadius():int
-    {
-        return _densityRadius;
-    }
-
-    /**
-     * @private
-     */
-    public function set densityRadius(value:int):void
-    {
-        if (_densityRadius !== value)
-        {
-            _densityRadius = value;
-            invalidateLayer();
-        }
-    }
-
-    //--------------------------------------------------------------------------
-    //
-    //  functions used to manipulate heatmap generation
-    //
-    //--------------------------------------------------------------------------
-
-    /**
-     * The function to use to calculate the density radius.
-     * If not set the heatmap layer will default to the internal function.
-     */
-    [Bindable(event="featureRadiusCalculatorChanged")]
-    public function set featureRadiusCalculator(value:Function):void
-    {
-        _featureRadiusCalculator = value === null ? internalFeatureRadiusCalculator : value;
-        invalidateLayer();
-    }
-
-    /**
-     * The function to use to calculate the index used to retrieve colors from
-     * the gradient dictionary.
-     * If not set the heatmap layer will default to the internal function.
-     */
-    [Bindable(event="featureIndexCalculatorChanged")]
-    public function set featureIndexCalculator(value:Function):void
-    {
-        _featureIndexCalculator = value === null ? internalFeatureCalculator : value;
-        invalidateLayer();
-    }
-
-    /**
-     * The function to use to calculate the cluster radius.
-     * If not set the heatmap layer will default to the internal function.
-     */
-    [Bindable(event="clusterRadiusCalculatorChanged")]
-    public function set clusterRadiusCalculator(value:Function):void
-    {
-        _clusterRadiusCalculator = value === null ? internalClusterRadiusCalculator : value;
-        invalidateLayer();
-    }
-
-    /**
-     * The function to use to calculate the cluster index.
-     * If not set the heatmap layer will default to the internal function.
-     */
-    [Bindable(event="clusterIndexCalculatorChanged")]
-    public function set clusterIndexCalculator(value:Function):void
-    {
-        _clusterIndexCalculator = value === null ? internalClusterCalculator : value;
-        invalidateLayer();
-    }
-
-    /**
-     * The function to use to calculate the cluster weight.
-     * If not set the heatmap layer will default to the internal function.
-     */
-    [Bindable(event="clusterWeightCalculatorChanged")]
-    public function set clusterWeightCalculator(value:Function):void
-    {
-        _clusterWeightCalculator = value === null ? internalWeightCalculator : value;
-        invalidateLayer();
+        var parseString:String = this.url;
+        var lastPos:int = parseString.lastIndexOf("/");
+        _urlService = parseString.substr(0, lastPos);
+        _urlLayerID = parseString.substr(lastPos + 1);
     }
 
     private function internalWeightCalculator(feature:Graphic):Number
@@ -936,5 +526,480 @@ public class ArcGISHeatMapLayer extends Layer
         return radius;
     }
 
+    //--------------------------------------------------------------------------
+    //
+    // Getters and setters
+    //
+    //--------------------------------------------------------------------------
+
+    //--------------------------------------
+    //  url
+    //--------------------------------------
+
+    [Bindable(event="urlChanged")]
+    /**
+     * URL of the point layer in feature or map service that will be used to generate the heatmap.
+     *
+     * @since ArcGISHeatMapLayer 1.0
+     */
+    public function get url():String
+    {
+        return _url;
+    }
+
+    /**
+     * @private
+     */
+    public function set url(value:String):void
+    {
+        if (_url != value)
+        {
+            _url = value;
+            _urlChanged = true;
+            invalidateProperties();
+            _layerDetails = null;
+            setLoaded(false);
+            dispatchEvent(new Event("urlChanged"));
+        }
+    }
+
+    //--------------------------------------
+    //  proxyURL
+    //--------------------------------------
+
+    /**
+     * The URL to proxy the request through.
+     *
+     * @since ArcGISHeatMapLayer 3.0
+     */
+    public function get proxyURL():String
+    {
+        return _proxyURL;
+    }
+
+    /**
+     * @private
+     */
+    public function set proxyURL(value:String):void
+    {
+        _proxyURL = value;
+    }
+
+    //--------------------------------------
+    //  token
+    //--------------------------------------
+
+    [Bindable(event="tokenChanged")]
+    /**
+     * Token for accessing a secure ArcGIS service.
+     *
+     * @since ArcGISHeatMapLayer 1.0
+     */
+    public function get token():String
+    {
+        return _token;
+    }
+
+    /**
+     * @private
+     */
+    public function set token(value:String):void
+    {
+        if (_token !== value)
+        {
+            _token = value;
+            dispatchEvent(new Event("tokenChanged"));
+        }
+    }
+
+    //--------------------------------------
+    //  useAMF
+    //--------------------------------------
+
+    [Bindable(event="useAMFChanged")]
+    /**
+     * Use AMF for executing the query. This is the preferred method, but the server must support it.
+     * Requires the server to be ArcGIS Server 10.0 or above, set to false if using earlier server versions.
+     * When useAMF is true, the BaseTask properties concurrency, requestTimeout and showBusyCursor are ignored.
+     *
+     * @default true
+     *
+     * @since ArcGISHeatMapLayer 1.0
+     */
+    public function get useAMF():Boolean
+    {
+        return _useAMF;
+    }
+
+    /**
+     * @private
+     */
+    public function set useAMF(value:Boolean):void
+    {
+        if (_useAMF !== value)
+        {
+            _useAMF = value;
+            dispatchEvent(new Event("useAMFChanged"));
+        }
+    }
+
+    //--------------------------------------
+    //  where
+    //--------------------------------------
+
+    [Bindable(event="whereChanged")]
+    /**
+     * A where clause for the query, refer to the Query class in the ArcGIS API for Flex documentation.
+     *
+     * @default 1=1
+     *
+     * @since ArcGISHeatMapLayer 1.0
+     */
+    public function get where():String
+    {
+        return _where;
+    }
+
+    /**
+     * @private
+     */
+    public function set where(value:String):void
+    {
+        if (_where !== value)
+        {
+            _where = value;
+            invalidateLayer();
+            dispatchEvent(new Event("whereChanged"));
+        }
+    }
+
+    //--------------------------------------
+    //  outFields
+    //--------------------------------------
+
+    [Bindable(event="outFieldsChanged")]
+    /**
+     * Attribute fields to include in the FeatureSet returned in the HeatMapEvent.
+     *
+     * @since ArcGISHeatMapLayer 1.0
+     */
+    public function get outFields():Array
+    {
+        return _outFields;
+    }
+
+    /**
+     * @private
+     */
+    public function set outFields(value:Array):void
+    {
+        if (_outFields !== value)
+        {
+            _outFields = value;
+            dispatchEvent(new Event("outFieldsChanged"));
+        }
+    }
+
+    //--------------------------------------
+    //  timeExtent
+    //--------------------------------------
+
+    [Bindable(event="timeExtentChanged")]
+    /**
+     * The time instant or the time extent to query, this is usually set internally
+     * through a time extent change event when the map time changes and not set directly.
+     *
+     * @see https://developers.arcgis.com/en/flex/api-reference/index.html?com/esri/ags/TimeExtent.html&com/esri/ags/class-list.html com.esri.ags.TimeExtent
+     *
+     * @since ArcGISHeatMapLayer 2.0
+     */
+    public function get timeExtent():TimeExtent
+    {
+        return _timeExtent;
+    }
+
+    /**
+     * @private
+     */
+    public function set timeExtent(value:TimeExtent):void
+    {
+        if (_timeExtent !== value)
+        {
+            _timeExtent = value;
+            invalidateLayer();
+            dispatchEvent(new Event("timeExtentChanged"));
+        }
+    }
+
+    //--------------------------------------
+    //  theme
+    //--------------------------------------
+
+    [Bindable(event="heatMapThemeChanged")]
+    /**
+     * The "named" color scheme used to generate the client-side heatmap layer.
+     * @default RAINBOW
+     * @see com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict#RAINBOW_TYPE
+     *
+     * @since ArcGISHeatMapLayer 1.0
+     */
+    public function get theme():String
+    {
+        return _heatMapTheme;
+    }
+
+    /**
+     * @private
+     */
+    public function set theme(value:String):void
+    {
+        if (_heatMapTheme !== value)
+        {
+            _heatMapTheme = value;
+            _gradientArray = HeatMapGradientDict.gradientArray(_heatMapTheme);
+            _themeChanged = true;
+            invalidateProperties();
+            dispatchEvent(new Event("heatMapThemeChanged"));
+        }
+    }
+
+    //--------------------------------------
+    //  layer details
+    //--------------------------------------
+
+    /**
+     * The detailed information from the ArcGIS web service layer used to generate the heatmap.
+     *
+     * @return The <code>LayerDetails</code> of the point layer being queried in the map or feature service.
+     *
+     * @see https://developers.arcgis.com/en/flex/api-reference/index.html?com/esri/ags/events/LayerEvent.html#LOAD&com/esri/ags/events/class-list.html com.esri.ags.events.LayerEvent.LOAD
+     * @see https://developers.arcgis.com/en/flex/api-reference/index.html?com/esri/ags/layers/supportClasses/LayerDetails.html&com/esri/ags/layers/supportClasses/class-list.html com.esri.ags.layers.supportClasses.LayerDetails
+     *
+     * @since ArcGISHeatMapLayer 3.0
+     */
+    public function get layerDetails():LayerDetails
+    {
+        return _layerDetails;
+    }
+
+    //--------------------------------------
+    //  cluster max weight
+    //--------------------------------------
+
+    [Bindable("clusterMaxWeightChanged")]
+    /**
+     * The maximum weight of the cluster.
+     *
+     * @since ArcGISHeatMapLayer 3.1
+     */
+    public function get clusterMaxWeight():Number
+    {
+        return _clusterMaxWeight;
+    }
+
+    //--------------------------------------
+    //  cluster count
+    //--------------------------------------
+
+    [Bindable("clusterCountChanged")]
+    /**
+     * The cluster count.
+     *
+     * @default 0
+     *
+     * @since ArcGISHeatMapLayer 3.1
+     */
+    public function get clusterCount():int
+    {
+        return _clusterCount;
+    }
+
+    //--------------------------------------
+    //  cluster size
+    //--------------------------------------
+
+    [Bindable]
+    /**
+     * The cluster size.
+     *
+     * @default 0
+     *
+     * @since ArcGISHeatMapLayer 3.1
+     */
+    public function get clusterSize():int
+    {
+        return _clusterSize;
+    }
+
+    /**
+     * @private
+     */
+    public function set clusterSize(value:int):void
+    {
+        if (_clusterSize !== value)
+        {
+            _clusterSize = value;
+            invalidateLayer();
+        }
+    }
+
+    //--------------------------------------
+    //  density radius
+    //--------------------------------------
+
+    [Bindable]
+    /**
+     * The density radius.  This controls the size of the heat
+     * radius for a given point.
+     *
+     * @default 25
+     *
+     * @since ArcGISHeatMapLayer 3.1
+     */
+    public function get densityRadius():int
+    {
+        return _densityRadius;
+    }
+
+    /**
+     * @private
+     */
+    public function set densityRadius(value:int):void
+    {
+        if (_densityRadius !== value)
+        {
+            _densityRadius = value;
+            invalidateLayer();
+        }
+    }
+
+    //--------------------------------------
+    //  feature radius calculator function
+    //--------------------------------------
+
+    [Bindable(event="featureRadiusCalculatorChanged")]
+    /**
+     * The function to use to calculate the density radius.
+     * If not set the heatmap layer will default to the internal function.
+     *
+     * @default internalFeatureRadiusCalculator
+     *
+     * @since ArcGISHeatMapLayer 3.1
+     */
+    public function set featureRadiusCalculator(value:Function):void
+    {
+        _featureRadiusCalculator = value === null ? internalFeatureRadiusCalculator : value;
+        invalidateLayer();
+    }
+
+    //--------------------------------------
+    //  feature index calculator function
+    //--------------------------------------
+
+    [Bindable(event="featureIndexCalculatorChanged")]
+    /**
+     * The function to use to calculate the index used to retrieve colors from
+     * the gradient dictionary.
+     * If not set the heatmap layer will default to the internal function.
+     *
+     * @default internalFeatureCalculator
+     *
+     * @since ArcGISHeatMapLayer 3.1
+     */
+    public function set featureIndexCalculator(value:Function):void
+    {
+        _featureIndexCalculator = value === null ? internalFeatureCalculator : value;
+        invalidateLayer();
+    }
+
+    //--------------------------------------
+    //  cluster radius calculator function
+    //--------------------------------------
+
+    [Bindable(event="clusterRadiusCalculatorChanged")]
+    /**
+     * The function to use to calculate the cluster radius.
+     * If not set the heatmap layer will default to the internal function.
+     *
+     * @default internalClusterRadiusCalculator
+     *
+     * @since ArcGISHeatMapLayer 3.1
+     */
+    public function set clusterRadiusCalculator(value:Function):void
+    {
+        _clusterRadiusCalculator = value === null ? internalClusterRadiusCalculator : value;
+        invalidateLayer();
+    }
+
+    //--------------------------------------
+    //  cluster index calculator function
+    //--------------------------------------
+
+    [Bindable(event="clusterIndexCalculatorChanged")]
+    /**
+     * The function to use to calculate the cluster index.
+     * If not set the heatmap layer will default to the internal function.
+     *
+     * @default internalClusterCalculator
+     *
+     * @since ArcGISHeatMapLayer 3.1
+     */
+    public function set clusterIndexCalculator(value:Function):void
+    {
+        _clusterIndexCalculator = value === null ? internalClusterCalculator : value;
+        invalidateLayer();
+    }
+
+    //--------------------------------------
+    //  cluster weight calculator function
+    //--------------------------------------
+
+    [Bindable(event="clusterWeightCalculatorChanged")]
+    /**
+     * The function to use to calculate the cluster weight.
+     * If not set the heatmap layer will default to the internal function.
+     *
+     * @default internalWeightCalculator
+     *
+     * @since ArcGISHeatMapLayer 3.1
+     */
+    public function set clusterWeightCalculator(value:Function):void
+    {
+        _clusterWeightCalculator = value === null ? internalWeightCalculator : value;
+        invalidateLayer();
+    }
+
+    //--------------------------------------
+    //  feature count
+    //--------------------------------------
+
+    [Bindable(event="featureCountChange")]
+    /**
+     * The number of point features used to create the heatmap layer.
+     *
+     * @see https://developers.arcgis.com/en/flex/api-reference/index.html?com/esri/ags/events/LayerEvent.html#UPDATE_END&com/esri/ags/events/class-list.html com.esri.ags.events.LayerEvent.UPDATE_END
+     *
+     * @since ArcGISHeatMapLayer 3.4
+     */
+    public function get featureCount():int
+    {
+        return _featureCount;
+    }
+
+    //--------------------------------------
+    //  feature set
+    //--------------------------------------
+
+    [Bindable(event="featureSetChange")]
+    /**
+     * The current set of features being used to generate the heatmap.
+     *
+     * @since ArcGISHeatMapLayer 3.4
+     */
+    public function get featureSet():FeatureSet
+    {
+        return _featureSet;
+    }
+
 } //end class
-}
+} //end package
