@@ -31,6 +31,10 @@ The component used to give user feedback that the heatmap widget is busy.
     <fx:Script>
         <![CDATA[
             [Bindable]
+            [Embed(source="../../../../../assets/images/loader.swf")]
+            private var loader:Class;
+
+            [Bindable]
             private var msgVisible:Boolean = false;
 
             /**
@@ -63,7 +67,7 @@ The component used to give user feedback that the heatmap widget is busy.
     </fx:Declarations>
     <!--- @private -->
     <s:SWFLoader id="swfMessage"
-                 source="@Embed('../../../../../assets/images/loader.swf')"
+                 source="{loader}"
                  visible="false"/>
     <s:Label id="txtMessage"
              width="90%"
