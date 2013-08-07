@@ -35,10 +35,8 @@
     </viewer:transitions>
     <fx:Script>
         <![CDATA[
-            import com.esri.ags.events.DetailsEvent;
             import com.esri.ags.events.LayerEvent;
             import com.esri.ags.layers.supportClasses.TimeInfo;
-            import com.esri.ags.samples.events.HeatMapEvent;
             import com.esri.ags.samples.layers.ArcGISHeatMapLayer;
             import com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict;
             import com.esri.ags.samples.utils.ColorMatrixUtil;
@@ -193,8 +191,8 @@
                 m_heatMapLayer = new ArcGISHeatMapLayer();
                 m_heatMapLayer.addEventListener(LayerEvent.LOAD, heatmapLayerLoadHandler, false, 0, true);
                 m_heatMapLayer.addEventListener(LayerEvent.LOAD_ERROR, heatmapLayerLoadErrorHandler, false, 0, true);
-                m_heatMapLayer.addEventListener(HeatMapEvent.REFRESH_START, refreshStartHandler, false, 0, true);
-                m_heatMapLayer.addEventListener(HeatMapEvent.REFRESH_END, refreshEndHandler, false, 0, true);
+                m_heatMapLayer.addEventListener(LayerEvent.UPDATE_START, refreshStartHandler, false, 0, true);
+                m_heatMapLayer.addEventListener(LayerEvent.UPDATE_END, refreshEndHandler, false, 0, true);
                 m_heatMapLayer.url = heatmap_QueryURL;
                 m_heatMapLayer.name = heatmapLayername;
                 m_heatMapLayer.alpha = heatmapAlpha
@@ -213,6 +211,7 @@
                 m_heatMapLayer.outFields = outFieldsArr;
                 map.addLayer(m_heatMapLayer);
                 showStateMainUI();
+                refreshStartHandler(null);
                 wTemplate.addTitlebarButton(ICON_URL + mainIcon, mainLabel, showStateMainUI);
                 wTemplate.addTitlebarButton(ICON_URL + settingsIcon, settingsLabel, showStateOptionsUI);
             }
@@ -247,7 +246,7 @@
             //--------------------------------------
             //  HeatMap layer event listener functions
             //--------------------------------------
-            protected function refreshStartHandler(event:HeatMapEvent):void
+            protected function refreshStartHandler(event:LayerEvent):void
             {
                 if (m_heatMapLayer.visible)
                 {
@@ -258,7 +257,7 @@
                 }
             }
 
-            protected function refreshEndHandler(event:HeatMapEvent):void
+            protected function refreshEndHandler(event:LayerEvent):void
             {
                 if (m_heatMapLayer.visible)
                 {
@@ -266,7 +265,7 @@
                     loadingMessage.showMessage("", false);
                     fadeEffectIn.play();
                     m_heatMapLayer.filters = [];
-                    featureCount = event.count;
+                    featureCount = m_heatMapLayer.featureCount;
 
                     if (sliderThumbCount == 2 && timeToggleButton.selected)
                     {
@@ -399,6 +398,7 @@
                 <s:Label id="lblLayerType" text="{heatmapQueryCompLabel}"/>
                 <s:DropDownList id="cboLayerType"
                                 change="cboLayerType_changeHandler(event)"
+                                enabled="{m_heatMapLayer.loaded}"
                                 minWidth="150"
                                 requireSelection="true"/>
             </s:HGroup>
@@ -423,7 +423,9 @@
                       gap="15"
                       horizontalAlign="left"
                       verticalAlign="middle">
-                <s:Label id="lblLayerCount" text="{featureCount} {featureCountLabel}"/>
+                <s:Label id="lblLayerCount"
+                         text="{featureCount} {featureCountLabel}"
+                         visible="{m_heatMapLayer.loaded}"/>
             </s:HGroup>
             <samples:ProgressMessage id="loadingMessage" includeInLayout="{isRefreshing}"/>
         </s:Group>
