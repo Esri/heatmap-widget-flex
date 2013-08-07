@@ -19,7 +19,7 @@ package com.esri.ags.samples.utils
 import mx.collections.ArrayCollection;
 
 /**
- *
+ * This utility can be used to populate a DropDownList component's dataProvider.
  *
  */
 public class UIComponentUtil
