@@ -23,14 +23,13 @@
                preinitialize="application_preinitializeHandler(event)">
     <fx:Script>
         <![CDATA[
-            import com.esri.ags.events.DetailsEvent;
             import com.esri.ags.events.LayerEvent;
             import com.esri.ags.layers.supportClasses.TimeInfo;
-            import com.esri.ags.samples.events.HeatMapEvent;
             import com.esri.ags.samples.layers.supportClasses.HeatMapGradientDict;
             import com.esri.ags.samples.utils.ColorMatrixUtil;
 
             import mx.collections.ArrayCollection;
+            import mx.controls.Alert;
             import mx.events.FlexEvent;
 
             import spark.events.IndexChangeEvent;
@@ -41,24 +40,23 @@
                 HeatMapGradientDict.fillCustomPaletteMap(customColors);
             }
 
-            protected function updateStartHandler(event:LayerEvent):void
+            protected function heatMapLayer_loadHandler(event:LayerEvent):void
             {
-                trace("updateStartHandler");
+                trace("heatMapLayer_loadHandler");
+                var timeInfo:TimeInfo = heatMapLayer.layerDetails.timeInfo;
+                if (timeInfo)
+                {
+                    trace(heatMapLayer.name + " is a time aware layer");
+                    myTimeSlider.createTimeStopsByTimeInterval(timeInfo.timeExtent, timeInfo.timeInterval, timeInfo.timeIntervalUnits);
+                    map.timeExtent = timeInfo.timeExtent;
+                }
             }
 
-            protected function updateEndHandler(event:LayerEvent):void
+            protected function heatMapLayer_loadErrorHandler(event:LayerEvent):void
             {
-                trace("updateEndHandler");
-            }
-
-            protected function loadHandler(event:LayerEvent):void
-            {
-                trace("loadHandler");
-            }
-
-            protected function loadErrorHandler(event:LayerEvent):void
-            {
-                trace("loadErrorHandler");
+                trace("heatMapLayer_loadErrorHandler");
+                errorString = "Some possible reasons are:\n\n" + event.fault.faultString + "\n" + event.fault.faultDetail;
+                Alert.show(errorString, "Well that was embarrasing ...");
             }
 
             protected function isInScaleRangeChangeHandler(event:LayerEvent):void
@@ -66,28 +64,19 @@
                 trace("isInScaleRangeChangeHandler");
             }
 
-            protected function refreshStartHandler(event:HeatMapEvent):void
+            protected function refreshStartHandler(event:LayerEvent):void
             {
                 trace("refreshStartHandler");
                 heatMapLayer.filters = [ ColorMatrixUtil.blackAndWhite ];
                 fadeEffectOut.play();
             }
 
-            protected function refreshEndHandler(event:HeatMapEvent):void
+            protected function refreshEndHandler(event:LayerEvent):void
             {
                 trace("refreshEndHandler");
                 fadeEffectIn.play();
                 heatMapLayer.filters = [];
-                dg.dataProvider = new ArrayCollection(event.featureSet.features);
-            }
-
-            protected function getDetailsCompleteHandler(event:DetailsEvent):void
-            {
-                trace("getDetailsCompleteHandler");
-                var timeInfo:TimeInfo = event.layerDetails.timeInfo;
-                myTimeSlider.createTimeStopsByTimeInterval(timeInfo.timeExtent, timeInfo.timeInterval, timeInfo.timeIntervalUnits);
-                map.timeExtent = timeInfo.timeExtent;
-
+                dg.dataProvider = new ArrayCollection(heatMapLayer.featureSet.features);
             }
 
             protected function themeChangeHandler(event:IndexChangeEvent):void
@@ -181,17 +170,13 @@
         <samples:ArcGISHeatMapLayer id="heatMapLayer"
                                     alpha="0.7"
                                     densityRadius="{densityRadius.value}"
-                                    getDetailsComplete="getDetailsCompleteHandler(event)"
                                     isInScaleRangeChange="isInScaleRangeChangeHandler(event)"
-                                    load="loadHandler(event)"
-                                    loadError="loadErrorHandler(event)"
+                                    load="heatMapLayer_loadHandler(event)"
+                                    loadError="heatMapLayer_loadErrorHandler(event)"
                                     outFields="*"
-                                    refreshEnd="refreshEndHandler(event)"
-                                    refreshStart="refreshStartHandler(event)"
-                                    updateEnd="updateEndHandler(event)"
-                                    updateStart="updateStartHandler(event)"
+                                    updateEnd="refreshEndHandler(event)"
+                                    updateStart="refreshStartHandler(event)"
                                     url="http://sampleserver3.arcgisonline.com/ArcGIS/rest/services/Earthquakes/Since_1970/MapServer/0"
-                                    useAMF="true"
                                     where="Magnitude > 0"/>
     </esri:Map>
 
