@@ -294,10 +294,13 @@ public class ArcGISHeatMapLayer extends Layer
         {
             if (token == url) // make sure result is for the current url
             {
-                var _featureSet:FeatureSet = result as FeatureSet;
-                _featureCount = _featureSet.features.length;
-                _dataProvider = new ArrayList(_featureSet.features);
-                redrawHeatMapLayer();
+                if (result)
+                {
+                    _featureSet = result as FeatureSet;
+                    _featureCount = _featureSet.features.length;
+                    _dataProvider = new ArrayList(_featureSet.features);
+                    redrawHeatMapLayer();
+                }
                 dispatchEvent(new LayerEvent(LayerEvent.UPDATE_END, thisLayer, null, true));
             }
         }
