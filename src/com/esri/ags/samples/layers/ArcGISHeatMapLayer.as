@@ -504,27 +504,27 @@ public class ArcGISHeatMapLayer extends Layer
         _urlLayerID = parseString.substr(lastPos + 1);
     }
 
-    private function internalWeightCalculator(feature:Graphic):Number
+    private static function internalWeightCalculator(feature:Graphic):Number
     {
         return 1.0;
     }
 
-    private function internalFeatureCalculator(feature:Graphic):int
+    private static function internalFeatureCalculator(feature:Graphic):int
     {
         return 255;
     }
 
-    private function internalClusterCalculator(cluster:Cluster, weightMax:Number):int
+    private static function internalClusterCalculator(cluster:Cluster, weightMax:Number):int
     {
         return 255 * cluster.weight / weightMax;
     }
 
-    private function internalFeatureRadiusCalculator(feature:Graphic, radius:Number):Number
+    private static function internalFeatureRadiusCalculator(feature:Graphic, radius:Number):Number
     {
         return radius;
     }
 
-    private function internalClusterRadiusCalculator(cluster:Cluster, radius:Number, weightMax:Number):Number
+    private static function internalClusterRadiusCalculator(cluster:Cluster, radius:Number, weightMax:Number):Number
     {
         return radius;
     }
