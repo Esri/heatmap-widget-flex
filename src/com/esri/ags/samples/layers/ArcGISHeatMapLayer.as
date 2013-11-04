@@ -138,7 +138,7 @@ public class ArcGISHeatMapLayer extends Layer
      * @param token Token for accessing a secure dynamic ArcGIS service.
      *
      */
-    public function ArcGISHeatMapLayer(url:String = null, proxyUrl:String = null, token:String = null)
+    public function ArcGISHeatMapLayer(url:String = null, proxyURL:String = null, token:String = null)
     {
         super();
 
