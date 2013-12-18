@@ -1,4 +1,10 @@
-## Version 3.5
+# Version 3.6
+
+* Released December 18, 2013. (see [Issue 16][ghi16])
+* Updated build.properties to require ArcGIS API 3.6 for Flex.
+* Updated meta.xml, widget version and description to reflect version 3.6.
+
+# Version 3.5
 
 * Released October 1st, 2013
 * Updated build.properties to require ArcGIS API 3.5 for Flex. (see [Issue 15][ghi15])
@@ -114,3 +120,4 @@
 [ghi12]: https://github.com/Esri/heatmap-widget-flex/issues/12
 [ghi13]: https://github.com/Esri/heatmap-widget-flex/issues/13
 [ghi15]: https://github.com/Esri/heatmap-widget-flex/issues/15
+[ghi16]: https://github.com/Esri/heatmap-widget-flex/issues/16
