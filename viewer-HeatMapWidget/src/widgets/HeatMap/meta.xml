@@ -20,7 +20,7 @@
     <openbydefault>true</openbydefault>
     <icon>assets/images/i_heatmap_icon.png</icon>
     <label>Heat Map</label>
-    <description>ArcGIS Viewer for Flex HeatMap widget v3.5.0</description>
+    <description>ArcGIS Viewer for Flex HeatMap widget v3.6.0</description>
     <helpurl>http://www.arcgis.com/home/item.html?id=43daf0ffb1d34e31ad752da1340aeb40</helpurl>
-    <widgetversion>3.5.0</widgetversion>
+    <widgetversion>3.6.0</widgetversion>
 </configuration>
